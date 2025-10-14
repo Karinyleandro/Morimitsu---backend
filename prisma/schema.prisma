@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id                  Int           @id @default(autoincrement())
+  cargo               Cargo
+  data_entrada        DateTime
+  data_saida          DateTime?
+  nome                String        @db.VarChar(100)
+  dataNascimento      DateTime
+  cpf                 String        @db.Char(11)
+  num_matricula       Int
+  telefone            String        @db.VarChar(15)
+  endereco            String        @db.VarChar(150)
+  faixa_id            Int?
+  genero              Genero
+  imagem_perfil_url   String?       @db.VarChar(255)
+  frequencia          Float?
+  id_responsavel      Int?
+  alunoTurmas         Aluno_Turma[]
+  graduacoes          Graduacao[]   @relation("AlunoGraduacao")
+  graduacoesValidadas Graduacao[]   @relation("CoordenadorGraduacao")
+  turmasCoordenador   Turma[]       @relation("TurmaCoordenador")
+  turmasProfessor     Turma[]       @relation("TurmaProfessor")
+  faixa               Faixa?        @relation(fields: [faixa_id], references: [id])
+  responsavel         Responsavel?  @relation(fields: [id_responsavel], references: [id])
+}
+
+model Faixa {
+  id               Int              @id @default(autoincrement())
+  nome             String           @db.VarChar(50)
+  imagem_faixa_url String?          @db.VarChar(255)
+  ordem            Int
+  requisitos       Requisito_Grau[]
+  usuarios         Usuario[]
+}
+
+model Requisito_Grau {
+  id                Int     @id @default(autoincrement())
+  faixa_id          Int
+  grau              Int
+  requisito_aulas   Int
+  tempo_minimo_dias Int
+  descricao         String? @db.VarChar(255)
+  faixa             Faixa   @relation(fields: [faixa_id], references: [id])
+}
+
+model Turma {
+  id             Int           @id @default(autoincrement())
+  nomeTurma      String        @db.VarChar(30)
+  dataCriacao    DateTime
+  faixaEtariaMin Int
+  faixaEtariaMax Int
+  id_professor   Int?
+  id_coordenador Int?
+  id_frequencia  String?       @db.Char(1)
+  alunos         Aluno_Turma[]
+  coordenador    Usuario?      @relation("TurmaCoordenador", fields: [id_coordenador], references: [id])
+  professor      Usuario?      @relation("TurmaProfessor", fields: [id_professor], references: [id])
+}
+
+model Aluno_Turma {
+  id_usuario_aluno     Int
+  id_turma             Int
+  frequencia_acumulada Float?
+  turma                Turma   @relation(fields: [id_turma], references: [id])
+  usuario              Usuario @relation(fields: [id_usuario_aluno], references: [id])
+
+  @@id([id_usuario_aluno, id_turma])
+}
+
+model Graduacao {
+  id             Int      @id @default(autoincrement())
+  faixa          String   @db.VarChar(20)
+  grau           Int
+  dataGraduacao  DateTime
+  id_coordenador Int
+  id_aluno       Int
+  aluno          Usuario  @relation("AlunoGraduacao", fields: [id_aluno], references: [id])
+  coordenador    Usuario  @relation("CoordenadorGraduacao", fields: [id_coordenador], references: [id])
+}
+
+model Responsavel {
+  id             Int       @id @default(autoincrement())
+  nome           String    @db.VarChar(100)
+  telefone       String    @db.VarChar(15)
+  grauParentesco String    @db.VarChar(50)
+  email          String    @db.VarChar(100)
+  alunos         Usuario[]
+}
+
+enum Cargo {
+  ALUNO
+  ALUNO_PROFESSOR
+  COORDENADOR
+}
+
+enum Genero {
+  F
+  M
+  OUTRO
+}
