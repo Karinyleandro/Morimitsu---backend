@@ -228,7 +228,7 @@ export async function logout(req, res) {
 }
 
 function generateToken(length = 5) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const chars = "0123456789";
   let token = "";
   for (let i = 0; i < length; i++) {
     const randomIndex = crypto.randomInt(0, chars.length);

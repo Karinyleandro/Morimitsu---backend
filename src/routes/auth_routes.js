@@ -184,10 +184,10 @@ router.post("/request-reset", validateBody(requestResetSchema), requestPasswordR
  *           schema:
  *             type: object
  *             required:
- *               - token
+ *               - codigoRecuperacao
  *               - newPassword
  *             properties:
- *               token:
+ *               codigoRecuperacao:
  *                 type: string
  *               newPassword:
  *                 type: string

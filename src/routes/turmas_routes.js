@@ -173,10 +173,7 @@ router.delete("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl
  *       200:
  *         description: Aluno adicionado à turma com sucesso
  */
-router.post("/:id/adicionar-aluno", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.adicionarAluno
-
-
-);
+router.post("/:id/adicionar-aluno", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.adicionarAluno);
 
 /**
  * @openapi
