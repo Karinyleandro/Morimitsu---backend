@@ -14,7 +14,7 @@ import {
 import { atualizarUsuarioSchema } from "../validations/usuario.validators.js";
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" }); // configuração básica para upload de fotos
+const upload = multer({ dest: "uploads/" }); // upload básico para futuras fotos
 
 /**
  * @openapi
@@ -27,7 +27,7 @@ const upload = multer({ dest: "uploads/" }); // configuração básica para uplo
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lista de usuários
+ *         description: Lista de usuários retornada com sucesso
  */
 router.get("/", authenticate, listarUsuarios);
 
@@ -35,8 +35,8 @@ router.get("/", authenticate, listarUsuarios);
  * @openapi
  * /usuarios/{id}:
  *   put:
- *     summary: Atualizar informações de um usuário (apenas campos obrigatórios)
- *     description: Atualiza os dados básicos obrigatórios de um usuário existente.
+ *     summary: Atualizar informações de um usuário
+ *     description: Atualiza qualquer campo do usuário (exceto senha). Apenas o próprio usuário ou coordenadores podem editar.
  *     tags:
  *       - usuários
  *     security:
@@ -45,7 +45,7 @@ router.get("/", authenticate, listarUsuarios);
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID do usuário a ser atualizado (hash)
+ *         description: ID hash do usuário
  *         schema:
  *           type: string
  *     requestBody:
@@ -54,35 +54,70 @@ router.get("/", authenticate, listarUsuarios);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - nome
- *               - email
- *               - dataNascimento
- *               - genero
- *               - tipo_usuario
  *             properties:
  *               nome:
  *                 type: string
- *                 example: João da Silva
+ *                 example: "João da Silva"
+ *               nome_social:
+ *                 type: string
+ *                 example: "Joãozinho"
  *               email:
  *                 type: string
  *                 format: email
- *                 example: joao.silva@example.com
+ *                 example: "joao@example.com"
+ *               cpf:
+ *                 type: string
+ *                 example: "12345678900"
+ *               num_matricula:
+ *                 type: string
+ *                 example: "2025001"
  *               dataNascimento:
  *                 type: string
  *                 format: date
  *                 example: "2000-05-10"
+ *               telefone:
+ *                 type: string
+ *                 example: "(11) 99999-8888"
+ *               endereco:
+ *                 type: string
+ *                 example: "Rua das Flores, 123"
+ *               grau:
+ *                 type: string
+ *                 example: "Faixa Preta"
  *               genero:
  *                 type: string
  *                 enum: [MASCULINO, FEMININO, OUTRO, NAO_INFORMADO]
- *                 example: MASCULINO
+ *                 example: "MASCULINO"
  *               tipo_usuario:
  *                 type: string
  *                 enum: [ALUNO, PROFESSOR, COORDENADOR, USUARIO]
- *                 example: ALUNO
- *               endereco:
+ *                 example: "PROFESSOR"
+ *               imagem_perfil_url:
  *                 type: string
- *                 example: "Alameda jose"
+ *                 format: uri
+ *                 example: "https://exemplo.com/imagem.jpg"
+ *               ativo:
+ *                 type: boolean
+ *                 example: true
+ *               ultimo_login:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-10-22T18:25:52.722Z"
+ *               id_faixa:
+ *                 type: integer
+ *                 example: 3
+ *               cargo_aluno:
+ *                 type: string
+ *                 example: "Líder de turma"
+ *     responses:
+ *       200:
+ *         description: Usuário atualizado com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       403:
+ *         description: Acesso negado
+ *       404:
+ *         description: Usuário não encontrado
  */
 router.put("/:id", authenticate, validateBody(atualizarUsuarioSchema), atualizarUsuario);
 
@@ -91,6 +126,7 @@ router.put("/:id", authenticate, validateBody(atualizarUsuarioSchema), atualizar
  * /usuarios/{id}:
  *   delete:
  *     summary: Deletar um usuário
+ *     description: Apenas coordenadores podem deletar usuários.
  *     tags:
  *       - usuários
  *     security:
@@ -99,12 +135,16 @@ router.put("/:id", authenticate, validateBody(atualizarUsuarioSchema), atualizar
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID do usuário (hash)
+ *         description: ID hash do usuário
  *         schema:
  *           type: string
  *     responses:
  *       200:
  *         description: Usuário deletado com sucesso
+ *       400:
+ *         description: Não é possível deletar o próprio usuário
+ *       403:
+ *         description: Acesso negado
  *       404:
  *         description: Usuário não encontrado
  */
@@ -115,6 +155,7 @@ router.delete("/:id", authenticate, deletarUsuario);
  * /usuarios/{id}/foto:
  *   put:
  *     summary: Atualizar foto de perfil do usuário via URL
+ *     description: Atualiza o campo imagem_perfil_url de um usuário existente.
  *     tags:
  *       - usuários
  *     security:
@@ -123,7 +164,7 @@ router.delete("/:id", authenticate, deletarUsuario);
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID do usuário (hash)
+ *         description: ID hash do usuário
  *         schema:
  *           type: string
  *     requestBody:
@@ -138,8 +179,16 @@ router.delete("/:id", authenticate, deletarUsuario);
  *               fotoUrl:
  *                 type: string
  *                 format: uri
- *                 description: URL da nova foto do usuário
  *                 example: "https://exemplo.com/foto.jpg"
+ *     responses:
+ *       200:
+ *         description: Foto atualizada com sucesso
+ *       400:
+ *         description: URL inválida
+ *       403:
+ *         description: Acesso negado
+ *       404:
+ *         description: Usuário não encontrado
  */
 router.put("/:id/foto", authenticate, atualizarFotoUsuario);
 

@@ -9,8 +9,6 @@ export function validarSenhaForte(senha) {
     return "A senha deve ter pelo menos uma letra minúscula";
   if (!/\d/.test(senha))
     return "A senha deve conter pelo menos um número";
-  if (!/[@$!%*?&]/.test(senha))
-    return "A senha deve conter pelo menos um caractere especial (@$!%*?&)";
 
   return true;
 }

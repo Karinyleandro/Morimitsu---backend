@@ -13,6 +13,7 @@ import {
     login, 
     logout, 
     requestPasswordReset, 
+    verifyResetCode, // ✅ adicionado
     resetPassword, 
     criarAluno 
 } from "../controllers/auth.js";
@@ -194,6 +195,45 @@ router.post("/request-reset", validateBody(requestResetSchema), requestPasswordR
 
 /**
  * @openapi
+ * /auth/verify-reset-code:
+ *   post:
+ *     summary: Verificar código de recuperação de senha
+ *     description: Confirma se o código informado é válido, ainda não foi utilizado e não expirou.
+ *     tags:
+ *       - auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: "12345"
+ *     responses:
+ *       200:
+ *         description: Código válido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Código válido
+ *                 userId:
+ *                   type: integer
+ *                   example: 10
+ *       400:
+ *         description: Código inválido ou expirado
+ */
+router.post("/verify-reset-code", verifyResetCode);
+
+/**
+ * @openapi
  * /auth/reset-password:
  *   post:
  *     summary: Resetar senha do usuário
@@ -206,18 +246,30 @@ router.post("/request-reset", validateBody(requestResetSchema), requestPasswordR
  *           schema:
  *             type: object
  *             required:
- *               - codigoRecuperacao
  *               - newPassword
+ *               - confirmPassword
  *             properties:
+ *               token:
+ *                 type: string
+ *                 example: "12345"
  *               codigoRecuperacao:
  *                 type: string
+ *                 example: "69613"
  *               newPassword:
  *                 type: string
+ *                 example: "NovaSenha@123"
+ *               confirmPassword:
+ *                 type: string
+ *                 example: "NovaSenha@123"
+ *             description: Informe **token** (do link) ou **codigoRecuperacao** (enviado por e-mail)
  *     responses:
  *       200:
  *         description: Senha atualizada com sucesso
+ *       400:
+ *         description: Dados inválidos ou código incorreto
  */
 router.post("/reset-password", validateBody(resetPasswordSchema), resetPassword);
+
 
 /**
  * @openapi

@@ -254,14 +254,14 @@ const resetLink = `https://morimitsu.com.br/redefinir-senha?token=${token}`;
 const mailOptions = {
   from: `"Morimitsu Suporte" <${process.env.EMAIL_USER}>`,
   to,
-  subject: "🥋 Recuperação de Senha - Morimitsu",
+  subject: " Recuperação de Senha - Morimitsu",
   html: `
   <div style="font-family: 'Poppins', 'Arial', sans-serif; background: radial-gradient(circle at top left, #000000, #1a1a1a); color: #fff; padding: 40px 0; text-align: center;">
-    <div style="max-width: 520px; margin: auto; background: #181818; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.6); overflow: hidden; border-top: 5px solid #ff2b2b;">
+    <div style="max-width: 520px; margin: auto; background: #181818; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.6); overflow: hidden; border-top: 5px solid #690808;">
       
-      <div style="background: linear-gradient(90deg, #ff0000, #a00000); padding: 25px 0;">
+      <div style="background: linear-gradient(90deg, #690808, #a00000); padding: 25px 0;">
         <h1 style="font-size: 34px; margin: 0; letter-spacing: 2px; color: #fff;">
-          🥋 MORIMITSU 🥋
+           MORIMITSU 
         </h1>
         <p style="font-size: 14px; margin-top: 6px; color: #ffe4e4;">
           Disciplina, força e superação — até na recuperação de senha!
@@ -269,7 +269,7 @@ const mailOptions = {
       </div>
 
       <div style="padding: 30px;">
-        <p style="font-size: 16px; color: #f5f5f5; margin-bottom: 10px;">👊 Olá, guerreiro(a)!</p>
+        <p style="font-size: 16px; color: #f5f5f5; margin-bottom: 10px;"> Olá, guerreiro(a)!</p>
         <p style="font-size: 15px; line-height: 1.6; color: #ccc;">
           Você solicitou a redefinição da sua senha.<br>
           Use o código abaixo ou clique no botão para continuar no caminho do 🥋 <b>faixa preta</b>:
@@ -309,13 +309,13 @@ const mailOptions = {
 
         <p style="margin-top: 25px; font-size: 13px; color: #999;">
           ⏳ Este código expira em <b>1 hora</b>.<br>
-          Se você não solicitou essa ação, ignore este e-mail — continue treinando firme 💪
+          Se você não solicitou essa ação, ignore este e-mail — continue treinando firme 
         </p>
       </div>
 
       <div style="background: #111; padding: 15px; font-size: 12px; color: #666;">
         © ${new Date().getFullYear()} <b>Morimitsu Jiu-Jitsu</b>.<br>
-        <span style="color: #ff2b2b;">🥋 Oss! Continue forte no caminho do guerreiro.</span>
+        <span style="color: #ff2b2b;"> Oss! Continue forte no caminho do guerreiro.</span>
       </div>
     </div>
   </div>
@@ -324,6 +324,41 @@ const mailOptions = {
 
 
   await transporter.sendMail(mailOptions);
+}
+
+export async function verifyResetCode(req, res) {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Código não fornecido" });
+    }
+
+    const entry = await prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!entry) {
+      return res.status(400).json({ message: "Código inválido" });
+    }
+
+    if (entry.used) {
+      return res.status(400).json({ message: "Código já utilizado" });
+    }
+
+    if (entry.expiresAt < new Date()) {
+      return res.status(400).json({ message: "Código expirado" });
+    }
+
+    return res.json({
+      message: "Código válido",
+      userId: entry.userId,
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: "Erro interno" });
+  }
 }
 
 // Função principal de requisição de reset de senha
@@ -357,26 +392,52 @@ export async function requestPasswordReset(req, res) {
 
 export async function resetPassword(req, res) {
   try {
-    const { token, newPassword } = req.body;
+    console.log("Body recebido:", req.body); // 👈 Loga o corpo que realmente chega
+
+    const { token, codigoRecuperacao, newPassword, confirmPassword } = req.body;
+    const code = token || codigoRecuperacao; // Aceita qualquer um dos dois campos
+
+    if (!code || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: "Preencha todos os campos" });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "As senhas não coincidem" });
+    }
 
     const entry = await prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: code },
       include: { user: true },
     });
 
-    if (!entry || entry.used) return res.status(400).json({ message: "Token inválido" });
-    if (entry.expiresAt < new Date()) return res.status(400).json({ message: "Token expirado" });
+    if (!entry || entry.used) {
+      return res.status(400).json({ message: "Código inválido ou já usado" });
+    }
+
+    if (entry.expiresAt < new Date()) {
+      return res.status(400).json({ message: "Código expirado" });
+    }
 
     const senhaValida = validarSenhaForte(newPassword);
-    if (senhaValida !== true) return res.status(400).json({ message: senhaValida });
+    if (senhaValida !== true) {
+      return res.status(400).json({ message: senhaValida });
+    }
 
     const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await prisma.usuario.update({ where: { id: entry.userId }, data: { passwordHash: hash } });
-    await prisma.passwordResetToken.update({ where: { id: entry.id }, data: { used: true } });
 
-    res.json({ message: "Senha atualizada" });
+    await prisma.usuario.update({
+      where: { id: entry.userId },
+      data: { passwordHash: hash },
+    });
+
+    await prisma.passwordResetToken.update({
+      where: { id: entry.id },
+      data: { used: true },
+    });
+
+    return res.json({ message: "Senha atualizada com sucesso" });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: "Erro interno" });
+    return res.status(500).json({ message: "Erro interno" });
   }
 }
