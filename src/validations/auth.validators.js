@@ -22,9 +22,14 @@ export const requestResetSchema = z.object({
   identifier: z.string().nonempty({ message: "Email ou CPF é obrigatório" }),
 });
 
+
 export const resetPasswordSchema = z.object({
-  token: z.string().nonempty({ message: "Token é obrigatório" }),
-  newPassword: z.string().min(8, { message: "Nova senha deve ter no mínimo 8 caracteres" }),
+  token: z.string().min(1, "Código obrigatório").optional(),
+  codigoRecuperacao: z.string().min(1, "Código obrigatório").optional(),
+  newPassword: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+  confirmPassword: z.string().min(8, "Confirmação obrigatória"),
+}).refine(data => data.token || data.codigoRecuperacao, {
+  message: "É necessário informar o token ou o código de recuperação",
 });
 
 export const criarAlunoSchema = z.object({

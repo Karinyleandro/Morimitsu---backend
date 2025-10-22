@@ -90,7 +90,7 @@ export async function listarUsuarios(req, res) {
 }
 
 export const atualizarUsuario = async (req, res) => {
-  const { id: hashIdParam } = req.params; // ID é hash
+  const { id: hashIdParam } = req.params;
   const {
     nome,
     nome_social,
@@ -106,44 +106,50 @@ export const atualizarUsuario = async (req, res) => {
     imagem_perfil_url,
     ativo,
     ultimo_login,
-    passwordHash
+    id_faixa,
+    cargo_aluno
   } = req.body;
 
   try {
+    // Localiza o usuário pelo hash
     const usuarioExistente = await encontrarUsuarioPorHash(hashIdParam);
-
     if (!usuarioExistente) {
       return res.status(404).json({ message: "Usuário não encontrado" });
     }
 
+    // Permissão: apenas o próprio usuário ou coordenador
     const usuarioAtual = req.user;
     if (usuarioAtual.sub !== usuarioExistente.id && usuarioAtual.tipo_usuario !== "COORDENADOR") {
       return res.status(403).json({ message: "Acesso negado" });
     }
 
+    // Gera objeto de atualização apenas com campos enviados
     const dataAtualizacao = {};
 
-    if (nome !== undefined) dataAtualizacao.nome = nome;
-    if (nome_social !== undefined) dataAtualizacao.nome_social = nome_social;
+    if (nome) dataAtualizacao.nome = nome.trim();
+    if (nome_social) dataAtualizacao.nome_social = nome_social.trim();
 
-    if (email !== undefined) {
+    if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         return res.status(400).json({ message: "Email inválido" });
       }
-      dataAtualizacao.email = email;
+      dataAtualizacao.email = email.trim().toLowerCase();
     }
 
-    if (cpf !== undefined) {
+    if (cpf) {
       if (!validarCPF(cpf)) {
         return res.status(400).json({ message: "CPF inválido" });
       }
-      dataAtualizacao.cpf = await bcrypt.hash(cpf, SALT_ROUNDS);
+      dataAtualizacao.cpf = cpf;
     }
 
-    if (num_matricula !== undefined) dataAtualizacao.num_matricula = num_matricula;
+    if (num_matricula) dataAtualizacao.num_matricula = num_matricula;
+    if (telefone) dataAtualizacao.telefone = telefone;
+    if (endereco) dataAtualizacao.endereco = endereco.trim();
+    if (grau) dataAtualizacao.grau = grau;
 
-    if (dataNascimento !== undefined) {
+    if (dataNascimento) {
       const dataNasc = new Date(dataNascimento);
       if (isNaN(dataNasc)) {
         return res.status(400).json({ message: "dataNascimento inválida" });
@@ -151,19 +157,12 @@ export const atualizarUsuario = async (req, res) => {
       dataAtualizacao.dataNascimento = dataNasc;
     }
 
-    if (telefone !== undefined) dataAtualizacao.telefone = telefone;
-    if (endereco !== undefined) dataAtualizacao.endereco = endereco;
-    if (grau !== undefined) dataAtualizacao.grau = grau;
-
-    if (genero !== undefined) {
+    if (genero) {
       const generoMap = { MASCULINO: "M", FEMININO: "F", OUTRO: "O", NAO_INFORMADO: "N" };
-      if (!generoMap[genero]) {
-        return res.status(400).json({ message: "Gênero inválido" });
-      }
-      dataAtualizacao.genero = generoMap[genero];
+      dataAtualizacao.genero = generoMap[genero] || genero;
     }
 
-    if (tipo_usuario !== undefined) {
+    if (tipo_usuario) {
       const tiposValidos = ["USUARIO", "COORDENADOR", "ALUNO", "PROFESSOR"];
       if (!tiposValidos.includes(tipo_usuario)) {
         return res.status(400).json({ message: "Tipo de usuário inválido" });
@@ -171,25 +170,51 @@ export const atualizarUsuario = async (req, res) => {
       dataAtualizacao.tipo_usuario = tipo_usuario;
     }
 
-    if (imagem_perfil_url !== undefined) dataAtualizacao.imagem_perfil_url = imagem_perfil_url;
-    if (ativo !== undefined) dataAtualizacao.ativo = ativo;
-    if (ultimo_login !== undefined) dataAtualizacao.ultimo_login = new Date(ultimo_login);
-    if (passwordHash !== undefined) dataAtualizacao.passwordHash = passwordHash;
+    if (imagem_perfil_url) {
+      try {
+        new URL(imagem_perfil_url);
+      } catch {
+        return res.status(400).json({ message: "URL de imagem inválida" });
+      }
+      dataAtualizacao.imagem_perfil_url = imagem_perfil_url;
+    }
+
+    if (ativo !== undefined) dataAtualizacao.ativo = Boolean(ativo);
+    if (ultimo_login) {
+      const dataLogin = new Date(ultimo_login);
+      if (isNaN(dataLogin)) {
+        return res.status(400).json({ message: "Data de último login inválida" });
+      }
+      dataAtualizacao.ultimo_login = dataLogin;
+    }
+
+    if (id_faixa !== undefined) dataAtualizacao.id_faixa = id_faixa;
+    if (cargo_aluno !== undefined) dataAtualizacao.cargo_aluno = cargo_aluno;
+
+    // Verifica se algum campo foi realmente enviado
+    if (Object.keys(dataAtualizacao).length === 0) {
+      return res.status(400).json({ message: "Nenhum campo enviado para atualização" });
+    }
 
     dataAtualizacao.atualizado_em = new Date();
 
+    // Atualiza o usuário
     const usuarioAtualizado = await prisma.usuario.update({
       where: { id: usuarioExistente.id },
       data: dataAtualizacao,
     });
 
-    res.status(200).json(usuarioAtualizado);
+    res.status(200).json({
+      message: "Usuário atualizado com sucesso",
+      usuario: usuarioAtualizado,
+    });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Erro ao atualizar usuário", error });
+    res.status(500).json({ message: "Erro ao atualizar usuário", error: error.message });
   }
 };
+
 
 export async function deletarUsuario(req, res) {
   try {

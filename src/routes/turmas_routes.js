@@ -58,27 +58,29 @@ router.get("/", authenticate, TurmaCtrl.listarTurmas);
  *             type: object
  *             required:
  *               - nome
- *               - faixaEtaria
- *               - totalAulas
+ *               - dataCriacao
+ *               - faixaEtariaMin
+ *               - faixaEtariaMax
  *             properties:
  *               nome:
  *                 type: string
- *                 example: Turma Infantil A
- *               faixaEtaria:
+ *                 example: Turma Juvenil A
+ *               dataCriacao:
  *                 type: string
- *                 enum: [Infantil, Fundamental]
- *                 example: Infantil
- *               totalAulas:
+ *                 format: date
+ *                 example: "2025-10-22"
+ *               faixaEtariaMin:
  *                 type: integer
- *                 example: 20
- *               professorResponsavel:
+ *                 example: 6
+ *               faixaEtariaMax:
  *                 type: integer
- *                 description: ID do professor responsável (opcional)
+ *                 example: 10
  *     responses:
  *       201:
  *         description: Turma criada com sucesso
  */
 router.post("/", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.criarTurma);
+
 
 /**
  * @openapi
@@ -105,18 +107,39 @@ router.post("/", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.cria
  *             properties:
  *               nome_turma:
  *                 type: string
+ *                 example: "Turma Baby"
+ *               data_criacao:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-10-22"
  *               faixa_etaria_min:
  *                 type: integer
+ *                 example: 3
  *               faixa_etaria_max:
  *                 type: integer
+ *                 example: 5
  *               total_aulas:
  *                 type: integer
+ *                 example: 20
  *               id_professor:
  *                 type: integer
+ *                 nullable: true
+ *                 description: ID do professor responsável (opcional)
+ *                 example: 12
+ *               id_coordenador:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: ID do coordenador responsável (opcional)
+ *                 example: 5
  *     responses:
  *       200:
  *         description: Turma atualizada com sucesso
+ *       404:
+ *         description: Turma, professor ou coordenador não encontrado
+ *       403:
+ *         description: Usuário não autorizado
  */
+
 router.put("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.editarTurma);
 
 /**
