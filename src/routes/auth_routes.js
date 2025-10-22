@@ -105,7 +105,8 @@ router.post("/register", authenticate, validateBody(registerSchema), register);
  * @openapi
  * /auth/login:
  *   post:
- *     summary: Login do usuário
+ *     summary: Login do usuário (CPF ou e-mail)
+ *     description: Permite login utilizando CPF ou e-mail, juntamente com a senha.
  *     tags:
  *       - auth
  *     requestBody:
@@ -120,15 +121,36 @@ router.post("/register", authenticate, validateBody(registerSchema), register);
  *             properties:
  *               identifier:
  *                 type: string
- *                 example: joao@email.com
+ *                 description: Pode ser o e-mail ou o CPF do usuário.
+ *                 oneOf:
+ *                   - example: joao@email.com
+ *                   - example: 89583367222
  *               password:
  *                 type: string
  *                 example: Senha@123
  *     responses:
  *       200:
  *         description: Login realizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 expiresIn:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *       401:
+ *         description: Credenciais inválidas
+ *       403:
+ *         description: Usuário sem acesso ao sistema
+ *       500:
+ *         description: Erro interno no servidor
  */
 router.post("/login", validateBody(loginSchema), login);
+
 
 /**
  * @openapi
