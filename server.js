@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import authRoutes from './src/routes/auth_routes.js';
+import cors from 'cors';
 import usuarioRoutes from './src/routes/usuario_routes.js'
 import turmaRoutes from './src/routes/turmas_routes.js';
 //import AlunoRoutes from './src/routes/aluno_routes.js'
@@ -13,6 +14,8 @@ const app = express();
 
 // Middleware essencial para parsear JSON
 app.use(express.json());
+
+app.use(cors());
 
 // Middleware para logar o body (opcional, útil para debug)
 app.use((req, res, next) => {
