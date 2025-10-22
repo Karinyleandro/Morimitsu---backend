@@ -246,6 +246,10 @@ router.post("/verify-reset-code", verifyResetCode);
  *           schema:
  *             type: object
  *             required:
+<<<<<<< HEAD
+=======
+ *               - codigoRecuperacao
+>>>>>>> a46d2d5 (token com apenas numeros)
  *               - newPassword
  *               - confirmPassword
  *             properties:
