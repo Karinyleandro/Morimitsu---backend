@@ -208,9 +208,9 @@ router.post("/request-reset", validateBody(requestResetSchema), requestPasswordR
  *           schema:
  *             type: object
  *             required:
- *               - token
+ *               - codigoRecuperacao:
  *             properties:
- *               token:
+ *               codigoRecuperacao:
  *                 type: string
  *                 example: "12345"
  *     responses:
@@ -249,9 +249,6 @@ router.post("/verify-reset-code", verifyResetCode);
  *               - newPassword
  *               - confirmPassword
  *             properties:
- *               token:
- *                 type: string
- *                 example: "12345"
  *               codigoRecuperacao:
  *                 type: string
  *                 example: "69613"

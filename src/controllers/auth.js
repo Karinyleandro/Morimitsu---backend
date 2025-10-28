@@ -15,7 +15,6 @@ function validarSenhaForte(senha) {
   if (!/[A-Z]/.test(senha)) return "A senha deve ter pelo menos uma letra maiúscula";
   if (!/[a-z]/.test(senha)) return "A senha deve ter pelo menos uma letra minúscula";
   if (!/\d/.test(senha)) return "A senha deve conter pelo menos um número";
-  if (!/[@$!%*?&]/.test(senha)) return "A senha deve conter pelo menos um caractere especial (@$!%*?&)";
   return true;
 }
 
@@ -328,35 +327,31 @@ const mailOptions = {
 
 export async function verifyResetCode(req, res) {
   try {
-    const { token } = req.body;
+    console.log("Body recebido:", req.body);
 
-    if (!token) {
+    // Aceita tanto 'codigoRecuperacao' quanto 'CodigoRecuperacao'
+    const { token, codigoRecuperacao, CodigoRecuperacao } = req.body;
+    const code = token || codigoRecuperacao || CodigoRecuperacao;
+
+    if (!code) {
       return res.status(400).json({ message: "Código não fornecido" });
     }
 
     const entry = await prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: code },
       include: { user: true },
     });
 
-    if (!entry) {
-      return res.status(400).json({ message: "Código inválido" });
-    }
-
-    if (entry.used) {
-      return res.status(400).json({ message: "Código já utilizado" });
-    }
-
-    if (entry.expiresAt < new Date()) {
-      return res.status(400).json({ message: "Código expirado" });
-    }
+    if (!entry) return res.status(400).json({ message: "Código inválido" });
+    if (entry.used) return res.status(400).json({ message: "Código já utilizado" });
+    if (entry.expiresAt < new Date()) return res.status(400).json({ message: "Código expirado" });
 
     return res.json({
       message: "Código válido",
       userId: entry.userId,
     });
   } catch (e) {
-    console.error(e);
+    console.error("Erro em verifyResetCode:", e);
     return res.status(500).json({ message: "Erro interno" });
   }
 }
@@ -392,11 +387,9 @@ export async function requestPasswordReset(req, res) {
 
 export async function resetPassword(req, res) {
   try {
-    console.log("Body recebido:", req.body); // 👈 Loga o corpo que realmente chega
-
+    console.log("Body recebido:", req.body);
     const { token, codigoRecuperacao, newPassword, confirmPassword } = req.body;
-    const code = token || codigoRecuperacao; // Aceita qualquer um dos dois campos
-
+    const code = token || codigoRecuperacao; 
     if (!code || !newPassword || !confirmPassword) {
       return res.status(400).json({ message: "Preencha todos os campos" });
     }
