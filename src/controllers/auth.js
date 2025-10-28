@@ -328,6 +328,7 @@ const mailOptions = {
 export async function verifyResetCode(req, res) {
   try {
 <<<<<<< HEAD
+<<<<<<< HEAD
     console.log("Body recebido:", req.body);
 
     // Aceita tanto 'codigoRecuperacao' quanto 'CodigoRecuperacao'
@@ -340,10 +341,20 @@ export async function verifyResetCode(req, res) {
 
     if (!token) {
 >>>>>>> c23afbd (corrigindo doc-api)
+=======
+    console.log("Body recebido:", req.body);
+
+    // Aceita tanto 'codigoRecuperacao' quanto 'CodigoRecuperacao'
+    const { token, codigoRecuperacao, CodigoRecuperacao } = req.body;
+    const code = token || codigoRecuperacao || CodigoRecuperacao;
+
+    if (!code) {
+>>>>>>> 1ff2d03 (organizando documentáção - ainda falta muitas coisinhas)
       return res.status(400).json({ message: "Código não fornecido" });
     }
 
     const entry = await prisma.passwordResetToken.findUnique({
+<<<<<<< HEAD
 <<<<<<< HEAD
       where: { token: code },
       include: { user: true },
@@ -369,6 +380,15 @@ export async function verifyResetCode(req, res) {
       return res.status(400).json({ message: "Código expirado" });
     }
 >>>>>>> c23afbd (corrigindo doc-api)
+=======
+      where: { token: code },
+      include: { user: true },
+    });
+
+    if (!entry) return res.status(400).json({ message: "Código inválido" });
+    if (entry.used) return res.status(400).json({ message: "Código já utilizado" });
+    if (entry.expiresAt < new Date()) return res.status(400).json({ message: "Código expirado" });
+>>>>>>> 1ff2d03 (organizando documentáção - ainda falta muitas coisinhas)
 
     return res.json({
       message: "Código válido",
@@ -376,10 +396,14 @@ export async function verifyResetCode(req, res) {
     });
   } catch (e) {
 <<<<<<< HEAD
+<<<<<<< HEAD
     console.error("Erro em verifyResetCode:", e);
 =======
     console.error(e);
 >>>>>>> c23afbd (corrigindo doc-api)
+=======
+    console.error("Erro em verifyResetCode:", e);
+>>>>>>> 1ff2d03 (organizando documentáção - ainda falta muitas coisinhas)
     return res.status(500).json({ message: "Erro interno" });
   }
 }
@@ -416,6 +440,7 @@ export async function requestPasswordReset(req, res) {
 export async function resetPassword(req, res) {
   try {
 <<<<<<< HEAD
+<<<<<<< HEAD
     console.log("Body recebido:", req.body);
     const { token, codigoRecuperacao, newPassword, confirmPassword } = req.body;
     const code = token || codigoRecuperacao; 
@@ -426,6 +451,11 @@ export async function resetPassword(req, res) {
     const code = token || codigoRecuperacao; // Aceita qualquer um dos dois campos
 
 >>>>>>> c23afbd (corrigindo doc-api)
+=======
+    console.log("Body recebido:", req.body);
+    const { token, codigoRecuperacao, newPassword, confirmPassword } = req.body;
+    const code = token || codigoRecuperacao; 
+>>>>>>> 1ff2d03 (organizando documentáção - ainda falta muitas coisinhas)
     if (!code || !newPassword || !confirmPassword) {
       return res.status(400).json({ message: "Preencha todos os campos" });
     }
