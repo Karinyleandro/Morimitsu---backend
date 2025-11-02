@@ -17,19 +17,24 @@ async function encontrarTurmaPorHash(hash) {
   return null;
 }
 
-
 const listarTurmas = async (req, res) => {
   try {
     const { faixaEtaria, nivelTecnico, q, page = 1, limit = 20 } = req.query;
     const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
 
     const where = {
-      ...(faixaEtaria && {
-        faixa_etaria_min: faixaEtaria === 'Infantil' ? 3 : faixaEtaria === 'Fundamental' ? 6 : undefined,
-        faixa_etaria_max: faixaEtaria === 'Infantil' ? 5 : faixaEtaria === 'Fundamental' ? 10 : undefined,
-      }),
-      ...(q && { nome_turma: { contains: q, mode: 'insensitive' } }),
-    };
+  ...(faixaEtaria && (
+    faixaEtaria === 'Baby'
+      ? { faixa_etaria_min: 4, faixa_etaria_max: 5 }
+      : faixaEtaria === 'Infantil'
+      ? { faixa_etaria_min: 6, faixa_etaria_max: 11 }
+      : faixaEtaria === 'Misto'
+      ? { faixa_etaria_min: { gte: 12 } } 
+      : {}
+  )),
+  ...(q && { nome_turma: { contains: q, mode: 'insensitive' } }),
+  };
+
 
     // Buscar turmas com include correto
     const turmas = await prisma.turma.findMany({
@@ -98,15 +103,14 @@ const criarTurma = async (req, res) => {
 
 export const editarTurma = async (req, res) => {
   try {
-    // ✅ Apenas COORDENADOR ou ADMIN podem editar
+    // Apenas Coordenador ou Admin podem editar turmas
     if (!["COORDENADOR", "ADMIN"].includes(req.user.tipo_usuario)) {
       return padraoRespostaErro(res, "Apenas coordenador ou admin pode editar turma", 403);
     }
 
     const { id: hashIdParam } = req.params;
-
-    // 🔍 Busca a turma real a partir do hash
     const turma = await encontrarTurmaPorHash(hashIdParam);
+
     if (!turma) {
       return padraoRespostaErro(res, "Turma não encontrada", 404);
     }
@@ -114,60 +118,59 @@ export const editarTurma = async (req, res) => {
     const atualizacoes = req.body;
     const dataAtualizada = {};
 
-    // ✏️ Só atualiza o que veio no body
-    if (atualizacoes.nome_turma !== undefined)
-      dataAtualizada.nome_turma = atualizacoes.nome_turma;
+    // Atualização de campos simples
+    if (atualizacoes.nome_turma) dataAtualizada.nome_turma = atualizacoes.nome_turma;
 
-    if (atualizacoes.data_criacao !== undefined)
-      dataAtualizada.data_criacao = new Date(atualizacoes.data_criacao);
+    if (atualizacoes.data_criacao) {
+      const dataValida = new Date(atualizacoes.data_criacao);
+      if (isNaN(dataValida)) {
+        return padraoRespostaErro(res, "Data de criação inválida", 400);
+      }
+      dataAtualizada.data_criacao = dataValida;
+    }
 
     if (atualizacoes.faixa_etaria_min !== undefined)
-      dataAtualizada.faixa_etaria_min = atualizacoes.faixa_etaria_min;
+      dataAtualizada.faixa_etaria_min = Number(atualizacoes.faixa_etaria_min);
 
     if (atualizacoes.faixa_etaria_max !== undefined)
-      dataAtualizada.faixa_etaria_max = atualizacoes.faixa_etaria_max;
+      dataAtualizada.faixa_etaria_max = Number(atualizacoes.faixa_etaria_max);
 
     if (atualizacoes.total_aulas !== undefined)
-      dataAtualizada.total_aulas = atualizacoes.total_aulas;
+      dataAtualizada.total_aulas = Number(atualizacoes.total_aulas);
 
-    // 👩‍🏫 Professor (opcional)
-    if (atualizacoes.id_professor !== undefined) {
+    // Professor
+    if (Object.prototype.hasOwnProperty.call(atualizacoes, "id_professor")) {
       if (atualizacoes.id_professor === null) {
-        // Remove professor atual
         dataAtualizada.professor = { disconnect: true };
       } else {
-        // Conecta professor, se existir
-        const existeProfessor = await prisma.usuario.findUnique({
-          where: { id: Number(atualizacoes.id_professor) },
-        });
+        const professorId = Number(atualizacoes.id_professor);
+        const existeProfessor = await prisma.usuario.findUnique({ where: { id: professorId } });
 
         if (!existeProfessor) {
           return padraoRespostaErro(res, "Professor não encontrado", 404);
         }
 
-        dataAtualizada.professor = { connect: { id: Number(atualizacoes.id_professor) } };
+        dataAtualizada.professor = { connect: { id: professorId } };
       }
     }
 
-    // 👨‍💼 Coordenador (opcional)
-    if (atualizacoes.id_coordenador !== undefined) {
+    // Coordenador
+    if (Object.prototype.hasOwnProperty.call(atualizacoes, "id_coordenador")) {
       if (atualizacoes.id_coordenador === null) {
-        // Remove coordenador atual
         dataAtualizada.coordenador = { disconnect: true };
       } else {
-        const existeCoord = await prisma.usuario.findUnique({
-          where: { id: Number(atualizacoes.id_coordenador) },
-        });
+        const coordId = Number(atualizacoes.id_coordenador);
+        const existeCoord = await prisma.usuario.findUnique({ where: { id: coordId } });
 
         if (!existeCoord) {
           return padraoRespostaErro(res, "Coordenador não encontrado", 404);
         }
 
-        dataAtualizada.coordenador = { connect: { id: Number(atualizacoes.id_coordenador) } };
+        dataAtualizada.coordenador = { connect: { id: coordId } };
       }
     }
 
-    // 🛠️ Atualiza turma
+    // Atualiza no banco
     const turmaAtualizada = await prisma.turma.update({
       where: { id: turma.id },
       data: dataAtualizada,
@@ -177,7 +180,7 @@ export const editarTurma = async (req, res) => {
       },
     });
 
-    // 🔒 Recria o hash no retorno
+    // Formata resposta
     const turmaFormatada = {
       ...turmaAtualizada,
       id: await hashId(turmaAtualizada.id),
@@ -194,11 +197,9 @@ export const editarTurma = async (req, res) => {
       return padraoRespostaErro(res, "Professor ou coordenador informado não existe", 404);
     }
 
-    return res.status(500).json({ mensagem: "Erro ao editar turma" });
+    return padraoRespostaErro(res, "Erro interno ao editar turma", 500);
   }
 };
-
-
 
 const removerTurma = async (req, res) => {
   try {

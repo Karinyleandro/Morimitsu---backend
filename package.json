@@ -1,15 +1,19 @@
 {
   "name": "morimitsu-backend",
   "version": "1.0.0",
+  "description": "Backend Morimitsu com TypeScript, Express, Prisma, Zod e Swagger",
+  "license": "ISC",
   "type": "module",
   "main": "dist/server.js",
+
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only --loader ts-node/esm src/server.ts",
+    "dev": "nodemon --watch src --exec ts-node-esm src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:studio": "prisma studio"
   },
+
   "dependencies": {
     "@prisma/client": "^6.17.1",
     "bcrypt": "^6.0.0",
@@ -17,26 +21,26 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.19.2",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.9",
-    "prisma": "^6.17.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0",
     "yaml-merge": "^0.0.2",
     "yamljs": "^0.3.0",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "prisma": "^6.17.1"
   },
+
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/nodemailer": "^7.0.2",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2"
-  },
-  "description": "Backend Morimitsu com TypeScript, Express, Prisma, Zod e Swagger",
-  "license": "ISC"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
 }
