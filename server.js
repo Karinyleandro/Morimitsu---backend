@@ -33,7 +33,8 @@ const swaggerOptions = {
       version: "1.0.0",
       description: "Documentação da API Morimitsu",
     },
-    servers: [{ url: "http://localhost:3000" }],
+    servers: [
+     {url: process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`,},],
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -72,5 +73,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\n Servidor rodando na porta ${PORT}`);
-  console.log(` Documentação Swagger disponível em http://localhost:${PORT}/docs\n`);
+  console.log(` Documentação Swagger disponível em ${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}/docs\n`);
 });
