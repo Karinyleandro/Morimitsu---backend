@@ -20,13 +20,15 @@ import {
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
-
 /**
  * @openapi
  * /auth/register:
  *   post:
- *     summary: Registrar um novo usuário (PROFESSOR ou COORDENADOR)
- *     description: Apenas coordenadores logados podem criar professores ou novos coordenadores
+ *     summary: Registrar um novo usuário (PROFESSOR, COORDENADOR ou ALUNO)
+ *     description: 
+ *       Apenas coordenadores logados podem criar novos usuários. 
+ *       Permite cadastrar professores, coordenadores ou alunos (sem acesso ao sistema). 
+ *       A matrícula do aluno é gerada automaticamente.
  *     tags:
  *       - auth
  *     security:
@@ -39,19 +41,15 @@ const router = express.Router();
  *             type: object
  *             required:
  *               - nome
- *               - email
  *               - cpf
  *               - dataNascimento
  *               - tipo_usuario
- *               - password
  *               - genero
  *             properties:
+ *               #  OBRIGATÓRIOS E OPICIONAIS DE ACORDO COM FUNÇÃO!
  *               nome:
  *                 type: string
  *                 example: João Silva
- *               email:
- *                 type: string
- *                 example: joao@email.com
  *               cpf:
  *                 type: string
  *                 example: 12345678909
@@ -61,15 +59,48 @@ const router = express.Router();
  *                 example: 1990-05-15
  *               tipo_usuario:
  *                 type: string
- *                 enum: [PROFESSOR, COORDENADOR]
- *                 example: PROFESSOR
- *               password:
- *                 type: string
- *                 example: Senha@123
+ *                 enum: [PROFESSOR, COORDENADOR, ALUNO]
+ *                 example: ALUNO
  *               genero:
  *                 type: string
  *                 enum: [MASCULINO, FEMININO, OUTRO]
  *                 example: MASCULINO
+ *               password:
+ *                 type: string
+ *                 nullable: true
+ *                 example: Senha@123
+ *                 description: Necessário apenas se o usuário tiver acesso ao sistema.
+ *               email:
+ *                 type: string
+ *                 nullable: true
+ *                 example: joao@email.com
+ *               nome_social:
+ *                 type: string
+ *                 nullable: true
+ *                 example: Joãozinho Silva
+ *               telefone:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "(11) 99999-9999"
+ *               endereco:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Rua das Flores, 123 - São Paulo/SP"
+ *               grau:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 2
+ *               imagem_perfil_url:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "https://cdn.morimitsu.com/perfis/joao.png"
+ *            
+ *               cargo_aluno:
+ *                 type: string
+ *                 nullable: true
+ *                 enum: [ALUNO, ALUNO_PROFESSOR]
+ *                 example: ALUNO
+ *
  *     responses:
  *       201:
  *         description: Usuário criado com sucesso
@@ -81,26 +112,33 @@ const router = express.Router();
  *                 message:
  *                   type: string
  *                   example: Usuário criado com sucesso
- *                 user:
+ *                 usuario:
  *                   type: object
  *                   properties:
  *                     id:
  *                       type: string
- *                       example: 1
+ *                       example: "abc123xyz"
  *                     nome:
  *                       type: string
  *                       example: João Silva
+ *                     tipo_usuario:
+ *                       type: string
+ *                       example: ALUNO
  *                     email:
  *                       type: string
  *                       example: joao@email.com
- *                     tipo_usuario:
- *                       type: string
- *                       example: PROFESSOR
+ *                     num_matricula:
+ *                       type: integer
+ *                       example: 10001
  *                     genero:
  *                       type: string
  *                       example: MASCULINO
+ *                     ativo:
+ *                       type: boolean
+ *                       example: true
  */
 router.post("/register", authenticate, validateBody(registerSchema), register);
+
 
 /**
  * @openapi
