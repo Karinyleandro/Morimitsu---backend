@@ -8,8 +8,6 @@ import dns from "node:dns";
 import nodemailer from "nodemailer";
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 
-
-
 const SALT_ROUNDS = 10;
 
 //Função para gerar número de matrícula automaticamente
