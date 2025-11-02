@@ -6,6 +6,9 @@ import { validarCPF } from "../utils/validacao_cpf.js";
 import crypto from "crypto";
 import dns from "node:dns";
 import nodemailer from "nodemailer";
+import { authenticate, authorize } from "../middlewares/auth.middleware.js";
+
+
 
 const SALT_ROUNDS = 10;
 
@@ -275,9 +278,9 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Credenciais inválidas" });
     }
 
-    // Bloqueia alunos sem acesso ao sistema
-    if (user.tipo_usuario === "ALUNO" && !user.passwordHash) {
-      return res.status(403).json({ message: "Este aluno não possui acesso ao sistema" });
+    //Apenas COORDENADOR e PROFESSOR podem logar
+    if (!["COORDENADOR", "PROFESSOR"].includes(user.tipo_usuario)) {
+      return res.status(403).json({ message: "Apenas coordenadores e professores podem acessar o sistema" });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
@@ -285,6 +288,7 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Credenciais inválidas" });
     }
 
+    // Atualiza último login
     await prisma.usuario.update({
       where: { id: user.id },
       data: { ultimo_login: new Date() },
@@ -295,17 +299,17 @@ export async function login(req, res) {
     const { token } = createJwt(payload);
     const hashedId = await hashId(user.id);
 
-    res.json({
+    res.status(200).json({
       token,
       expiresIn: process.env.JWT_EXPIRES_IN,
       user: { ...user, id: hashedId },
     });
+
   } catch (e) {
     console.error("Erro no login:", e);
     res.status(500).json({ message: "Erro interno no servidor" });
   }
 }
-
 
 export async function logout(req, res) {
   try {

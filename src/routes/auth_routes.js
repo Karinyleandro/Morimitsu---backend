@@ -26,7 +26,7 @@ const router = express.Router();
  *   post:
  *     summary: Registrar um novo usuário (PROFESSOR, COORDENADOR ou ALUNO)
  *     description: 
- *       Apenas coordenadores logados podem criar novos usuários. 
+ *       Apenas **coordenadores logados** podem criar novos usuários. 
  *       Permite cadastrar professores, coordenadores ou alunos (sem acesso ao sistema). 
  *       A matrícula do aluno é gerada automaticamente.
  *     tags:
@@ -46,7 +46,6 @@ const router = express.Router();
  *               - tipo_usuario
  *               - genero
  *             properties:
- *               #  OBRIGATÓRIOS E OPICIONAIS DE ACORDO COM FUNÇÃO!
  *               nome:
  *                 type: string
  *                 example: João Silva
@@ -94,13 +93,11 @@ const router = express.Router();
  *                 type: string
  *                 nullable: true
  *                 example: "https://cdn.morimitsu.com/perfis/joao.png"
- *            
  *               cargo_aluno:
  *                 type: string
  *                 nullable: true
  *                 enum: [ALUNO, ALUNO_PROFESSOR]
  *                 example: ALUNO
- *
  *     responses:
  *       201:
  *         description: Usuário criado com sucesso
@@ -136,16 +133,20 @@ const router = express.Router();
  *                     ativo:
  *                       type: boolean
  *                       example: true
+ *       403:
+ *         description: Acesso negado — apenas coordenadores podem registrar novos usuários
  */
-router.post("/register", authenticate, validateBody(registerSchema), register);
-
+router.post("/register", authenticate, authorize("COORDENADOR"), validateBody(registerSchema), register);
 
 /**
  * @openapi
  * /auth/login:
  *   post:
- *     summary: Login do usuário (CPF ou e-mail)
- *     description: Permite login utilizando CPF ou e-mail, juntamente com a senha.
+ *     summary: Login do usuário (somente COORDENADOR ou PROFESSOR)
+ *     description: |
+ *       Permite login utilizando CPF, e-mail ou número de matrícula, juntamente com a senha.  
+ *       Apenas usuários com o tipo **COORDENADOR** ou **PROFESSOR** podem acessar o sistema.  
+ *       Alunos sem senha ou acesso não conseguem logar.
  *     tags:
  *       - auth
  *     requestBody:
@@ -160,16 +161,26 @@ router.post("/register", authenticate, validateBody(registerSchema), register);
  *             properties:
  *               identifier:
  *                 type: string
- *                 description: Pode ser o e-mail ou o CPF do usuário.
- *                 oneOf:
- *                   - example: joao@email.com
- *                   - example: 89583367222
+ *                 description: Pode ser o e-mail, CPF, nome ou número de matrícula do usuário.
+ *                 examples:
+ *                   email:
+ *                     summary: Exemplo com e-mail
+ *                     value: joao@email.com
+ *                   cpf:
+ *                     summary: Exemplo com CPF
+ *                     value: "89583367222"
+ *                   matricula:
+ *                     summary: Exemplo com número de matrícula
+ *                     value: "10001"
+ *                   nome:
+ *                     summary: Exemplo com nome de usuário
+ *                     value: "João Silva"
  *               password:
  *                 type: string
  *                 example: Senha@123
  *     responses:
  *       200:
- *         description: Login realizado com sucesso
+ *         description: "Login realizado com sucesso"
  *         content:
  *           application/json:
  *             schema:
@@ -177,19 +188,36 @@ router.post("/register", authenticate, validateBody(registerSchema), register);
  *               properties:
  *                 token:
  *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *                 expiresIn:
  *                   type: string
+ *                   example: "1h"
  *                 user:
  *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       example: "user123"
+ *                     nome:
+ *                       type: string
+ *                       example: "João Silva"
+ *                     tipo_usuario:
+ *                       type: string
+ *                       example: "PROFESSOR"
+ *                     email:
+ *                       type: string
+ *                       example: "joao@email.com"
+ *                     genero:
+ *                       type: string
+ *                       example: "MASCULINO"
  *       401:
- *         description: Credenciais inválidas
+ *         description: "Credenciais inválidas"
  *       403:
- *         description: Usuário sem acesso ao sistema
+ *         description: "Usuário sem acesso ao sistema (ex: ALUNO)"
  *       500:
- *         description: Erro interno no servidor
+ *         description: "Erro interno no servidor"
  */
 router.post("/login", validateBody(loginSchema), login);
-
 
 /**
  * @openapi
