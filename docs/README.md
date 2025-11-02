@@ -43,16 +43,63 @@ O projeto segue o padrão **Model–View–Controller (MVC)**, garantindo separa
 | **Hospedagem** | Render |
 
 ---
-
 ## 🚀 Como Rodar o Projeto
 
-### 1️⃣ Clonar o repositório
-```bash
-git clone https://github.com/SEU_USUARIO/morimitsu-backend.git
-cd morimitsu-backend```
+```yaml
+setup:
+  steps:
+    - step: "1️⃣ Clonar o repositório"
+      command: |
+        git clone https://github.com/Karinyleandro/Morimitsu---backend.git
+        cd Morimitsu---backend
 
----
-## Instalar dependências
+    - step: "2️⃣ Instalar dependências"
+      command: |
+        npm install
 
-```bash
-npm install
+    - step: "3️⃣ Configurar o ambiente"
+      description: "Crie um arquivo .env na raiz do projeto com as seguintes variáveis:"
+      env_file:
+        DATABASE_URL: "postgresql://postgres.iwvzkazexfifcvdadyol:morimitsu123@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
+        JWT_SECRET: "morimitsu123"
+        JWT_EXPIRES_IN: "1h"
+        PORT: 3000
+        EMAIL_USER: "morimitsujiujitsu@gmail.com"
+        EMAIL_PASS: "ggty llud wnjm vkjz"
+        EMAIL_HOST: "smtp.gmail.com"
+        EMAIL_PORT: 587
+
+    - step: "4️⃣ Rodar as migrações do Prisma"
+      command: |
+        npx prisma migrate dev
+
+    - step: "5️⃣ Iniciar o servidor"
+      command: |
+        node server.js
+      note: "O servidor será iniciado em: http://localhost:3000"
+
+documentation:
+  swagger:
+    local: "http://localhost:3000/docs"
+    online: "https://morimitsu-backend.onrender.com/docs"
+    description: "Inclui todos os endpoints, exemplos de requisição e resposta, e códigos de erro."
+
+authentication:
+  type: "JWT (JSON Web Token)"
+  header:
+    key: "Authorization"
+    format: "Bearer <seu_token>"
+  description: "A API utiliza JWT para autenticação e autorização. O token deve ser enviado no cabeçalho das requisições protegidas."
+
+deploy:
+  platform: "Render"
+  database: "PostgreSQL (via Supabase)"
+  env_variables:
+    DATABASE_URL: "postgresql://postgres.iwvzkazexfifcvdadyol:morimitsu123@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
+    JWT_SECRET: "morimitsu123"
+    JWT_EXPIRES_IN: "1h"
+    PORT: 3000
+    EMAIL_USER: "morimitsujiujitsu@gmail.com"
+    EMAIL_PASS: "ggty llud wnjm vkjz"
+    EMAIL_HOST: "smtp.gmail.com"
+    EMAIL_PORT: 587
