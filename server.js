@@ -1,36 +1,37 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import authRoutes from './src/routes/auth_routes.js';
-import cors from 'cors';
-import usuarioRoutes from './src/routes/usuario_routes.js'
-import turmaRoutes from './src/routes/turmas_routes.js';
-//import AlunoRoutes from './src/routes/aluno_routes.js'
-import swaggerJsDoc from 'swagger-jsdoc';
-import swaggerUi from 'swagger-ui-express';
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import swaggerJsDoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
+
+import authRoutes from "./src/routes/auth_routes.js";
+import usuarioRoutes from "./src/routes/usuario_routes.js";
+import turmaRoutes from "./src/routes/turmas_routes.js";
+// import alunoRoutes from "./src/routes/aluno_routes.js";
 
 dotenv.config();
 
 const app = express();
 
-// Middleware essencial para parsear JSON
-app.use(express.json());
 
 app.use(cors());
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-// Middleware para logar o body (opcional, útil para debug)
 app.use((req, res, next) => {
-  console.log(`[${req.method}] ${req.url} - Body:`, req.body);
+  console.log(`\n[${req.method}] ${req.url}`);
+  console.log("Headers:", req.headers["content-type"]);
+  console.log("Body recebido:", req.body);
   next();
 });
 
-// Configuração do Swagger
 const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
     info: {
       title: "API Morimitsu",
       version: "1.0.0",
-      description: "Documentação das rotas da API Morimitsu",
+      description: "Documentação da API Morimitsu",
     },
     servers: [{ url: "http://localhost:3000" }],
     components: {
@@ -48,33 +49,28 @@ const swaggerOptions = {
 };
 
 const swaggerSpec = swaggerJsDoc(swaggerOptions);
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Rotas da API
-app.use('/auth', authRoutes);
-app.use('/usuarios', usuarioRoutes);
-app.use('/turmas', turmaRoutes);
-//app.use('/alunos', AlunoRoutes);
+app.use("/auth", authRoutes);
+app.use("/usuarios", usuarioRoutes);
+app.use("/turmas", turmaRoutes);
+// app.use("/alunos", alunoRoutes);
 
-// Rota raiz
-app.get('/', (req, res) => {
-  res.send('API Morimitsu está rodando!');
+app.get("/", (req, res) => {
+  res.send(" API Morimitsu está rodando!");
 });
 
-// Middleware para 404
 app.use((req, res) => {
-  res.status(404).json({ message: 'Rota não encontrada' });
+  res.status(404).json({ message: "Rota não encontrada" });
 });
 
-// Middleware global de erros (opcional, para capturar erros não tratados)
 app.use((err, req, res, next) => {
-  console.error('Erro não tratado:', err);
-  res.status(500).json({ message: 'Erro interno' });
+  console.error(" Erro não tratado:", err);
+  res.status(500).json({ message: "Erro interno do servidor" });
 });
 
-// Inicialização do servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-  console.log(`Documentação Swagger disponível em http://localhost:${PORT}/docs`);
+  console.log(`\n Servidor rodando na porta ${PORT}`);
+  console.log(` Documentação Swagger disponível em http://localhost:${PORT}/docs\n`);
 });

@@ -167,7 +167,6 @@ export async function criarAluno(req, res) {
   }
 }
 
-
 export async function login(req, res) {
   try {
     const { identifier, password } = req.body;

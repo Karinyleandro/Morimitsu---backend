@@ -36,14 +36,14 @@ router.get("/", authenticate, listarUsuarios);
  * /usuarios/{id}:
  *   put:
  *     summary: Atualizar informações de um usuário
- *     description: Atualiza qualquer campo do usuário (exceto senha). Apenas o próprio usuário ou coordenadores podem editar.
+ *     description: Atualiza os dados básicos de um usuário, incluindo a senha. Apenas o próprio usuário, COORDENADOR ou ADMIN podem editar.
  *     tags:
  *       - usuários
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
  *         description: ID hash do usuário
  *         schema:
@@ -58,9 +58,6 @@ router.get("/", authenticate, listarUsuarios);
  *               nome:
  *                 type: string
  *                 example: "João da Silva"
- *               nome_social:
- *                 type: string
- *                 example: "Joãozinho"
  *               email:
  *                 type: string
  *                 format: email
@@ -68,9 +65,6 @@ router.get("/", authenticate, listarUsuarios);
  *               cpf:
  *                 type: string
  *                 example: "12345678900"
- *               num_matricula:
- *                 type: string
- *                 example: "2025001"
  *               dataNascimento:
  *                 type: string
  *                 format: date
@@ -81,34 +75,19 @@ router.get("/", authenticate, listarUsuarios);
  *               endereco:
  *                 type: string
  *                 example: "Rua das Flores, 123"
- *               grau:
- *                 type: string
- *                 example: "Faixa Preta"
  *               genero:
  *                 type: string
  *                 enum: [MASCULINO, FEMININO, OUTRO, NAO_INFORMADO]
  *                 example: "MASCULINO"
- *               tipo_usuario:
- *                 type: string
- *                 enum: [ALUNO, PROFESSOR, COORDENADOR, USUARIO]
- *                 example: "PROFESSOR"
  *               imagem_perfil_url:
  *                 type: string
  *                 format: uri
  *                 example: "https://exemplo.com/imagem.jpg"
- *               ativo:
- *                 type: boolean
- *                 example: true
- *               ultimo_login:
+ *               senha:
  *                 type: string
- *                 format: date-time
- *                 example: "2025-10-22T18:25:52.722Z"
- *               id_faixa:
- *                 type: integer
- *                 example: 3
- *               cargo_aluno:
- *                 type: string
- *                 example: "Líder de turma"
+ *                 format: password
+ *                 description: Nova senha do usuário (opcional)
+ *                 example: "NovaSenha@123"
  *     responses:
  *       200:
  *         description: Usuário atualizado com sucesso
@@ -118,6 +97,8 @@ router.get("/", authenticate, listarUsuarios);
  *         description: Acesso negado
  *       404:
  *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno no servidor
  */
 router.put("/:id", authenticate, validateBody(atualizarUsuarioSchema), atualizarUsuario);
 

@@ -18,7 +18,7 @@ const router = express.Router();
  *         name: faixaEtaria
  *         schema:
  *           type: string
- *           enum: [Infantil, Fundamental]
+ *           enum: [Baby, Infantil, Mista]
  *         description: Filtra turmas por faixa etária
  *       - in: query
  *         name: q
