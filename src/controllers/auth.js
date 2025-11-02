@@ -4,9 +4,27 @@ import { v4 as uuidv4 } from "uuid";
 import prisma from "../prisma.js";
 import { validarCPF } from "../utils/validacao_cpf.js";
 import crypto from "crypto";
+import dns from "node:dns";
 import nodemailer from "nodemailer";
 
 const SALT_ROUNDS = 10;
+
+//Função para gerar número de matrícula automaticamente
+async function gerarMatricula() {
+  const ano = new Date().getFullYear();
+  const ultimoUsuario = await prisma.usuario.findFirst({
+    where: { num_matricula: { not: null } },
+    orderBy: { num_matricula: "desc" },
+    select: { num_matricula: true },
+  });
+
+  const base = ano * 10000;
+  // Exemplo: 20250000
+  const proximaMatricula = ultimoUsuario?.num_matricula
+    ? ultimoUsuario.num_matricula + 1
+    : base + 1;
+  return proximaMatricula;
+}
 
 // Função para validar força da senha
 function validarSenhaForte(senha) {
@@ -33,16 +51,47 @@ async function hashId(id) {
   return await bcrypt.hash(id.toString(), SALT_ROUNDS);
 }
 
+// Função para verificar domínio de e-mail
+function verificarDominioEmail(email) {
+  return new Promise((resolve) => {
+    const dominio = email.split("@")[1];
+    if (!dominio) return resolve(false);
+
+    dns.resolveMx(dominio, (err, addresses) => {
+      if (err || !addresses || addresses.length === 0) return resolve(false);
+      resolve(true);
+    });
+  });
+}
+
 export async function register(req, res) {
   try {
-    const { nome, email, cpf, dataNascimento, tipo_usuario, password, genero } = req.body;
+    const {
+      nome,
+      nome_social,
+      email,
+      cpf,
+      dataNascimento,
+      tipo_usuario,
+      password,
+      genero,
+      telefone,
+      endereco,
+      grau,
+      imagem_perfil_url,
+      id_faixa,
+      cargo_aluno,
+      ativo = true,
+    } = req.body;
 
-    if (!nome || !email || !cpf || !dataNascimento || !tipo_usuario || !password || !genero) {
-      return res.status(400).json({ message: "Todos os campos são obrigatórios" });
+    if (!nome || !cpf || !dataNascimento || !tipo_usuario || !password || !genero) {
+      return res.status(400).json({
+        message: "Campos obrigatórios: nome, cpf, dataNascimento, tipo_usuario, password e genero",
+      });
     }
 
-    if (!["PROFESSOR", "COORDENADOR"].includes(tipo_usuario)) {
-      return res.status(400).json({ message: "Tipo de usuário não permitido" });
+    if (!["PROFESSOR", "COORDENADOR", "ALUNO"].includes(tipo_usuario)) {
+      return res.status(400).json({ message: "Tipo de usuário inválido" });
     }
 
     if (!["MASCULINO", "FEMININO", "OUTRO"].includes(genero)) {
@@ -54,40 +103,76 @@ export async function register(req, res) {
     const senhaValida = validarSenhaForte(password);
     if (senhaValida !== true) return res.status(400).json({ message: senhaValida });
 
-    const existing = await prisma.usuario.findFirst({ where: { OR: [{ email }, { cpf }] } });
-    if (existing) return res.status(409).json({ message: "Email ou CPF já cadastrado" });
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Formato de e-mail inválido" });
+      }
+
+      const dominioValido = await verificarDominioEmail(email);
+      if (!dominioValido) {
+        return res.status(400).json({ message: "Domínio de e-mail inexistente ou inválido" });
+      }
+    }
+
+    const existente = await prisma.usuario.findFirst({
+      where: {
+        OR: [
+          { cpf },
+          email ? { email } : undefined,
+        ].filter(Boolean),
+      },
+    });
+
+    if (existente) {
+      return res.status(409).json({
+        message: "Já existe um usuário com este CPF ou e-mail",
+      });
+    }
+
+    //Gera número de matrícula automaticamente
+    const num_matricula = await gerarMatricula();
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-
     const generoMap = { MASCULINO: "M", FEMININO: "F", OUTRO: "OUTRO" };
 
-    const user = await prisma.usuario.create({
+    const usuario = await prisma.usuario.create({
       data: {
+        tipo_usuario,
+        cargo_aluno: tipo_usuario === "ALUNO" ? cargo_aluno || "ALUNO" : null,
         nome,
-        email,
+        nome_social: nome_social || null,
+        num_matricula,
         cpf,
         dataNascimento: new Date(dataNascimento),
-        tipo_usuario,
-        passwordHash,
+        telefone: telefone || null,
+        endereco: endereco || null,
+        grau: grau ? Number(grau) : null,
+        email: email || null,
         genero: generoMap[genero],
+        imagem_perfil_url: imagem_perfil_url || null,
+        ativo: Boolean(ativo),
+        id_faixa: id_faixa ? Number(id_faixa) : null,
+        passwordHash,
       },
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        tipo_usuario: true,
-        genero: true,
+      include: {
+        faixa: true,
+        responsaveis: true,
+        aluno_turmas: { include: { turma: true } },
       },
     });
 
-    const hashedId = await hashId(user.id);
+    const hashedId = await hashId(usuario.id);
+
     res.status(201).json({
-      message: "Usuário criado com sucesso",
-      user: { ...user, id: hashedId },
+      message: "Usuário registrado com sucesso",
+      usuario: { ...usuario, id: hashedId },
     });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ message: "Erro interno" });
+  } catch (error) {
+    console.error("Erro ao registrar usuário:", error);
+    res
+      .status(error.status || 500)
+      .json({ message: error.message || "Erro interno no servidor" });
   }
 }
 
@@ -171,13 +256,24 @@ export async function login(req, res) {
   try {
     const { identifier, password } = req.body;
 
+    if (!identifier || !password) {
+      return res.status(400).json({ message: "Informe o identificador e a senha" });
+    }
+
     const user = await prisma.usuario.findFirst({
-      where: { OR: [{ email: identifier }, { cpf: identifier }, { nome: identifier }] },
+      where: {
+        OR: [
+          { email: identifier },
+          { cpf: identifier },
+          { nome: identifier },
+          { num_matricula: isNaN(Number(identifier)) ? -1 : Number(identifier) },
+        ],
+      },
     });
 
-    // Se não existe ou não tem senha (ex.: aluno sem acesso)
-    if (!user || !user.passwordHash) 
+    if (!user || !user.passwordHash) {
       return res.status(401).json({ message: "Credenciais inválidas" });
+    }
 
     // Bloqueia alunos sem acesso ao sistema
     if (user.tipo_usuario === "ALUNO" && !user.passwordHash) {
@@ -185,13 +281,18 @@ export async function login(req, res) {
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) return res.status(401).json({ message: "Credenciais inválidas" });
+    if (!valid) {
+      return res.status(401).json({ message: "Credenciais inválidas" });
+    }
 
-    await prisma.usuario.update({ where: { id: user.id }, data: { ultimo_login: new Date() } });
+    await prisma.usuario.update({
+      where: { id: user.id },
+      data: { ultimo_login: new Date() },
+    });
 
+    // Gera JWT
     const payload = { sub: user.id, tipo_usuario: user.tipo_usuario, nome: user.nome };
     const { token } = createJwt(payload);
-
     const hashedId = await hashId(user.id);
 
     res.json({
@@ -200,10 +301,11 @@ export async function login(req, res) {
       user: { ...user, id: hashedId },
     });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ message: "Erro interno" });
+    console.error("Erro no login:", e);
+    res.status(500).json({ message: "Erro interno no servidor" });
   }
 }
+
 
 export async function logout(req, res) {
   try {
