@@ -1,4 +1,5 @@
 import express from "express";
+const router = express.Router();
 import { validateBody } from "../middlewares/zodMiddleware.js";
 
 import { 
@@ -19,16 +20,15 @@ import {
 } from "../controllers/auth.js";
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 
-const router = express.Router();
 /**
  * @openapi
  * /auth/register:
  *   post:
  *     summary: Registrar um novo usuário (PROFESSOR, COORDENADOR ou ALUNO)
  *     description: 
- *       Apenas **coordenadores logados** podem criar novos usuários. 
- *       Permite cadastrar professores, coordenadores ou alunos (sem acesso ao sistema). 
- *       A matrícula do aluno é gerada automaticamente.
+ *       Apenas **coordenadores logados** podem criar novos usuários.  
+ *       Permite cadastrar professores, coordenadores ou alunos (sem acesso ao sistema).  
+ *       O campo **num_matricula** é opcional e pode ser informado manualmente pelo coordenador.
  *     tags:
  *       - auth
  *     security:
@@ -45,6 +45,7 @@ const router = express.Router();
  *               - dataNascimento
  *               - tipo_usuario
  *               - genero
+ *               - password
  *             properties:
  *               nome:
  *                 type: string
@@ -66,7 +67,6 @@ const router = express.Router();
  *                 example: MASCULINO
  *               password:
  *                 type: string
- *                 nullable: true
  *                 example: Senha@123
  *                 description: Necessário apenas se o usuário tiver acesso ao sistema.
  *               email:
@@ -98,6 +98,11 @@ const router = express.Router();
  *                 nullable: true
  *                 enum: [ALUNO, ALUNO_PROFESSOR]
  *                 example: ALUNO
+ *               num_matricula:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "20241023"
+ *                 description: Número de matrícula opcional. Pode ser informado manualmente pelo coordenador.
  *     responses:
  *       201:
  *         description: Usuário criado com sucesso
@@ -125,8 +130,8 @@ const router = express.Router();
  *                       type: string
  *                       example: joao@email.com
  *                     num_matricula:
- *                       type: integer
- *                       example: 10001
+ *                       type: string
+ *                       example: "20241023"
  *                     genero:
  *                       type: string
  *                       example: MASCULINO
