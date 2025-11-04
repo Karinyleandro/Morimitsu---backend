@@ -425,6 +425,8 @@ const mailOptions = {
   `,
 };
 
+console.log("Tentando enviar e-mail para:", to);
+console.log("Usando host:", process.env.EMAIL_HOST);
 
   await transporter.sendMail(mailOptions);
 }
