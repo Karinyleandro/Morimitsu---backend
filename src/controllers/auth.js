@@ -5,8 +5,9 @@ import prisma from "../prisma.js";
 import { validarCPF } from "../utils/validacao_cpf.js";
 import crypto from "crypto";
 import dns from "node:dns";
-import nodemailer from "nodemailer";
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
+import nodemailer from "nodemailer";
+import { google } from "googleapis";
 
 const SALT_ROUNDS = 10;
 /*
@@ -351,17 +352,30 @@ function generateToken(length = 5) {
 }
 
 // Função para enviar o e-mail
+
 async function sendPasswordResetEmail(to, token) {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+
+  oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+
+  const accessToken = await oAuth2Client.getAccessToken();
+
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 465,
-    secure: true, // Porta 465 usa SSL
+    service: "gmail",
     auth: {
+      type: "OAuth2",
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
+      accessToken: accessToken?.token,
     },
     tls: {
-      rejectUnauthorized: false, // Evita erro de certificado no Render
+      rejectUnauthorized: false, // aql problema do render
     },
   });
 
@@ -370,7 +384,7 @@ async function sendPasswordResetEmail(to, token) {
   const mailOptions = {
     from: `"Morimitsu Suporte" <${process.env.EMAIL_USER}>`,
     to,
-    subject: " Recuperação de Senha - Morimitsu Jiu-Jitsu",
+    subject: "Recuperação de Senha - Morimitsu Jiu-Jitsu",
     html: `
       <div style="font-family: 'Poppins', Arial, sans-serif; background-color: #0d0d0d; color: #fff; padding: 40px 0; text-align: center;">
         <div style="max-width: 520px; margin: auto; background: #181818; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.6); overflow: hidden; border-top: 5px solid #690808;">
@@ -436,6 +450,8 @@ async function sendPasswordResetEmail(to, token) {
 
   await transporter.sendMail(mailOptions);
 }
+export default sendPasswordResetEmail;
+
 
 export async function verifyResetCode(req, res) {
   try {
