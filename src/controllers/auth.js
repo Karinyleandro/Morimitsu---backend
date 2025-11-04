@@ -143,7 +143,7 @@ export async function register(req, res) {
         cargo_aluno: tipo_usuario === "ALUNO" ? cargo_aluno || "ALUNO" : null,
         nome,
         nome_social: nome_social || null,
-        num_matricula: num_matricula || null, 
+        num_matricula: num_matricula || null, // <- apenas se o coordenador enviar
         cpf,
         dataNascimento: new Date(dataNascimento),
         telefone: telefone || null,
@@ -176,7 +176,6 @@ export async function register(req, res) {
       .json({ message: error.message || "Erro interno no servidor" });
   }
 }
-
 
 export async function criarAluno(req, res) {
   try {
@@ -425,8 +424,6 @@ const mailOptions = {
   `,
 };
 
-console.log("Tentando enviar e-mail para:", to);
-console.log("Usando host:", process.env.EMAIL_HOST);
 
   await transporter.sendMail(mailOptions);
 }
@@ -467,29 +464,34 @@ export async function requestPasswordReset(req, res) {
   try {
     const { identifier } = req.body;
 
-    // Procura usuário por e-mail ou CPF
     const user = await prisma.usuario.findFirst({
       where: { OR: [{ email: identifier }, { cpf: identifier }] },
     });
 
     if (!user) return res.json({ message: "Se existir, um e-mail foi enviado" });
 
-    // Gera token seguro de 5 caracteres
+    //Apaga tokens antigos antes de gerar outro
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id },
+    });
+
+    // Gera novo token
     const token = generateToken(5);
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // expira em 1 hora
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // expira em 1h
 
-    // Salva token no banco
-    await prisma.passwordResetToken.create({ data: { token, userId: user.id, expiresAt } });
+    await prisma.passwordResetToken.create({
+      data: { token, userId: user.id, expiresAt },
+    });
 
-    // Envia e-mail
     await sendPasswordResetEmail(user.email, token);
 
-    res.json({ message: "E-mail de recuperação enviado" });
+    return res.json({ message: "E-mail de recuperação enviado" });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: "Erro interno" });
+    return res.status(500).json({ message: "Erro interno" });
   }
 }
+
 
 export async function resetPassword(req, res) {
   try {
