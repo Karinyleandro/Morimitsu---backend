@@ -215,7 +215,6 @@ export const atualizarUsuario = async (req, res) => {
   }
 };
 
-
 export async function deletarUsuario(req, res) {
   try {
     const { id: hashIdParam } = req.params;

@@ -77,6 +77,7 @@ export async function register(req, res) {
       password,
       genero,
       telefone,
+      num_matricula, 
       endereco,
       grau,
       imagem_perfil_url,
@@ -85,6 +86,7 @@ export async function register(req, res) {
       ativo = true,
     } = req.body;
 
+    // Validação dos campos obrigatórios
     if (!nome || !cpf || !dataNascimento || !tipo_usuario || !password || !genero) {
       return res.status(400).json({
         message: "Campos obrigatórios: nome, cpf, dataNascimento, tipo_usuario, password e genero",
@@ -131,19 +133,17 @@ export async function register(req, res) {
       });
     }
 
-    //Gera número de matrícula automaticamente
-    const num_matricula = await gerarMatricula();
-
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     const generoMap = { MASCULINO: "M", FEMININO: "F", OUTRO: "OUTRO" };
 
+    // Criação do usuário
     const usuario = await prisma.usuario.create({
       data: {
         tipo_usuario,
         cargo_aluno: tipo_usuario === "ALUNO" ? cargo_aluno || "ALUNO" : null,
         nome,
         nome_social: nome_social || null,
-        num_matricula,
+        num_matricula: num_matricula || null, 
         cpf,
         dataNascimento: new Date(dataNascimento),
         telefone: telefone || null,
@@ -176,6 +176,7 @@ export async function register(req, res) {
       .json({ message: error.message || "Erro interno no servidor" });
   }
 }
+
 
 export async function criarAluno(req, res) {
   try {
