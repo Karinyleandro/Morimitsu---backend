@@ -355,9 +355,8 @@ function generateToken(length = 5) {
 
 const OAuth2 = google.auth.OAuth2;
 
-
 export async function sendPasswordResetEmail(to, token) {
-  console.log(" Iniciando envio de e-mail de recuperação...");
+  console.log("📧 Iniciando envio de e-mail de recuperação...");
 
   try {
     const oauth2Client = new OAuth2(
@@ -370,9 +369,7 @@ export async function sendPasswordResetEmail(to, token) {
       refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
     });
 
-    console.log(" Gerando access token...");
     const accessToken = await oauth2Client.getAccessToken();
-    console.log("Access token obtido:", !!accessToken?.token);
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -392,19 +389,68 @@ export async function sendPasswordResetEmail(to, token) {
     const mailOptions = {
       from: `"Morimitsu Suporte" <${process.env.EMAIL_USER}>`,
       to,
-      subject: "Recuperação de Senha - Morimitsu Jiu-Jitsu",
-      html: `<p>Use este código para redefinir sua senha:</p><h2>${token}</h2>`,
+      subject: "🥋 Recuperação de Senha - Morimitsu Jiu-Jitsu",
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #000; color: #fff; max-width: 600px; margin: auto; border-radius: 12px; overflow: hidden; box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);">
+
+          <!-- Cabeçalho -->
+          <div style="background-color: #b30000; text-align: center; padding: 25px 20px;">
+            <h1 style="margin: 0; font-size: 28px; letter-spacing: 1px;">MORIMITSU</h1>
+            <p style="margin: 5px 0 0; color: #fff; font-size: 14px;">
+              Disciplina, força e superação — até na recuperação de senha!
+            </p>
+          </div>
+
+          <!-- Corpo -->
+          <div style="padding: 35px 25px; text-align: center;">
+            <h2 style="margin-bottom: 10px; font-size: 20px;">Olá, guerreiro(a)!</h2>
+            <p style="color: #ccc; font-size: 15px; margin-bottom: 25px;">
+              Você solicitou a redefinição da sua senha.<br>
+              Use o código abaixo ou clique no botão para continuar no caminho<br>
+              da 🥋 <strong>faixa preta</strong>:
+            </p>
+
+            <!-- Código -->
+            <div style="background-color: #1a1a1a; border: 2px dashed #e50914; border-radius: 8px; display: inline-block; padding: 15px 35px; margin-bottom: 25px;">
+              <h1 style="color: #e50914; font-size: 36px; letter-spacing: 3px; margin: 0;">${token}</h1>
+            </div>
+
+            <!-- Botão -->
+            <div>
+              <a href="${resetLink}"
+                style="background-color: #e50914; color: #fff; text-decoration: none;
+                font-weight: bold; padding: 14px 40px; border-radius: 50px;
+                display: inline-block; font-size: 15px; margin-top: 10px;
+                box-shadow: 0 4px 10px rgba(255, 0, 0, 0.4);">
+                REDEFINIR SENHA
+              </a>
+            </div>
+
+            <p style="color: #999; font-size: 13px; margin-top: 25px;">
+              ⏳ Este código expira em 1 hora.<br>
+              Se você não solicitou essa ação, ignore este e-mail — continue treinando firme 💪
+            </p>
+          </div>
+
+          <!-- Rodapé -->
+          <div style="background-color: #0d0d0d; text-align: center; padding: 15px; border-top: 1px solid #1f1f1f;">
+            <p style="font-size: 12px; color: #555; margin: 0;">
+              © ${new Date().getFullYear()} Morimitsu Jiu-Jitsu — Todos os direitos reservados.
+            </p>
+          </div>
+        </div>
+      `,
     };
 
     console.log("📤 Enviando email para:", to);
     await transporter.sendMail(mailOptions);
-    console.log("E-mail enviado com sucesso!");
-
+    console.log("✅ E-mail enviado com sucesso!");
   } catch (error) {
-    console.error("Erro ao enviar email:", error);
+    console.error("❌ Erro ao enviar email:", error);
     throw new Error(`Falha no envio: ${error.message}`);
   }
 }
+
 
 export async function verifyResetCode(req, res) {
   try {
