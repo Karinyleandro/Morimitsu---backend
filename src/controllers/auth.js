@@ -353,105 +353,58 @@ function generateToken(length = 5) {
 
 // Função para enviar o e-mail
 
-async function sendPasswordResetEmail(to, token) {
-  const oAuth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  );
+const OAuth2 = google.auth.OAuth2;
 
-  oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
 
-  const accessToken = await oAuth2Client.getAccessToken();
+export async function sendPasswordResetEmail(to, token) {
+  console.log(" Iniciando envio de e-mail de recuperação...");
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      type: "OAuth2",
-      user: process.env.EMAIL_USER,
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-      accessToken: accessToken?.token,
-    },
-    tls: {
-      rejectUnauthorized: false, // aql problema do render
-    },
-  });
+  try {
+    const oauth2Client = new OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
 
-  const resetLink = `https://morimitsu.com.br/redefinir-senha?token=${token}`;
+    oauth2Client.setCredentials({
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+    });
 
-  const mailOptions = {
-    from: `"Morimitsu Suporte" <${process.env.EMAIL_USER}>`,
-    to,
-    subject: "Recuperação de Senha - Morimitsu Jiu-Jitsu",
-    html: `
-      <div style="font-family: 'Poppins', Arial, sans-serif; background-color: #0d0d0d; color: #fff; padding: 40px 0; text-align: center;">
-        <div style="max-width: 520px; margin: auto; background: #181818; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.6); overflow: hidden; border-top: 5px solid #690808;">
-          
-          <div style="background: linear-gradient(90deg, #690808, #a00000); padding: 25px 0;">
-            <h1 style="font-size: 34px; margin: 0; letter-spacing: 2px;">MORIMITSU</h1>
-            <p style="font-size: 14px; margin-top: 6px; color: #ffe4e4;">
-              Disciplina, força e superação — até na recuperação de senha!
-            </p>
-          </div>
+    console.log(" Gerando access token...");
+    const accessToken = await oauth2Client.getAccessToken();
+    console.log("Access token obtido:", !!accessToken?.token);
 
-          <div style="padding: 30px;">
-            <p style="font-size: 16px; color: #f5f5f5;">Olá, guerreiro(a)!</p>
-            <p style="font-size: 15px; line-height: 1.6; color: #ccc;">
-              Você solicitou a redefinição da sua senha.<br>
-              Use o código abaixo ou clique no botão para continuar no caminho do 🥋 <b>faixa preta</b>:
-            </p>
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        type: "OAuth2",
+        user: process.env.EMAIL_USER,
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
+        accessToken: accessToken?.token,
+      },
+      tls: { rejectUnauthorized: false },
+    });
 
-            <div style="
-              background: rgba(255, 0, 0, 0.1);
-              border: 2px dashed #ff2b2b;
-              border-radius: 10px;
-              color: #ff2b2b;
-              font-size: 40px;
-              font-weight: 800;
-              letter-spacing: 4px;
-              margin: 25px 0;
-              padding: 18px 0;
-            ">
-              ${token}
-            </div>
+    const resetLink = `https://morimitsu.com.br/redefinir-senha?token=${token}`;
 
-            <a href="${resetLink}" style="
-              display: inline-block;
-              background: linear-gradient(90deg, #ff0000, #ff5e00);
-              color: #fff;
-              text-decoration: none;
-              padding: 14px 36px;
-              border-radius: 30px;
-              font-size: 16px;
-              font-weight: bold;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-              box-shadow: 0 4px 12px rgba(255,0,0,0.4);
-            " target="_blank">
-              Redefinir Senha
-            </a>
+    const mailOptions = {
+      from: `"Morimitsu Suporte" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: "Recuperação de Senha - Morimitsu Jiu-Jitsu",
+      html: `<p>Use este código para redefinir sua senha:</p><h2>${token}</h2>`,
+    };
 
-            <p style="margin-top: 25px; font-size: 13px; color: #999;">
-              ⏳ Este código expira em <b>1 hora</b>.<br>
-              Se você não solicitou essa ação, ignore este e-mail.
-            </p>
-          </div>
+    console.log("📤 Enviando email para:", to);
+    await transporter.sendMail(mailOptions);
+    console.log("E-mail enviado com sucesso!");
 
-          <div style="background: #111; padding: 15px; font-size: 12px; color: #666;">
-            © ${new Date().getFullYear()} <b>Morimitsu Jiu-Jitsu</b>.<br>
-            <span style="color: #ff2b2b;">Oss! Continue firme no caminho do guerreiro.</span>
-          </div>
-        </div>
-      </div>
-    `,
-  };
-
-  await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Erro ao enviar email:", error);
+    throw new Error(`Falha no envio: ${error.message}`);
+  }
 }
-export default sendPasswordResetEmail;
-
 
 export async function verifyResetCode(req, res) {
   try {
