@@ -77,7 +77,7 @@ export async function register(req, res) {
       password,
       genero,
       telefone,
-      num_matricula, 
+      num_matricula, // pode ser enviado ou não
       endereco,
       grau,
       imagem_perfil_url,
@@ -86,10 +86,10 @@ export async function register(req, res) {
       ativo = true,
     } = req.body;
 
-    // Validação dos campos obrigatórios
     if (!nome || !cpf || !dataNascimento || !tipo_usuario || !password || !genero) {
       return res.status(400).json({
-        message: "Campos obrigatórios: nome, cpf, dataNascimento, tipo_usuario, password e genero",
+        message:
+          "Campos obrigatórios: nome, cpf, dataNascimento, tipo_usuario, password e genero",
       });
     }
 
@@ -101,10 +101,14 @@ export async function register(req, res) {
       return res.status(400).json({ message: "Gênero inválido" });
     }
 
-    if (!validarCPF(cpf)) return res.status(400).json({ message: "CPF inválido" });
+    if (!validarCPF(cpf)) {
+      return res.status(400).json({ message: "CPF inválido" });
+    }
 
     const senhaValida = validarSenhaForte(password);
-    if (senhaValida !== true) return res.status(400).json({ message: senhaValida });
+    if (senhaValida !== true) {
+      return res.status(400).json({ message: senhaValida });
+    }
 
     if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -114,7 +118,9 @@ export async function register(req, res) {
 
       const dominioValido = await verificarDominioEmail(email);
       if (!dominioValido) {
-        return res.status(400).json({ message: "Domínio de e-mail inexistente ou inválido" });
+        return res
+          .status(400)
+          .json({ message: "Domínio de e-mail inexistente ou inválido" });
       }
     }
 
@@ -123,27 +129,32 @@ export async function register(req, res) {
         OR: [
           { cpf },
           email ? { email } : undefined,
+          num_matricula ? { num_matricula } : undefined, // garante unicidade se tiver
         ].filter(Boolean),
       },
     });
 
     if (existente) {
       return res.status(409).json({
-        message: "Já existe um usuário com este CPF ou e-mail",
+        message: "Já existe um usuário com este CPF, e-mail ou número de matrícula",
       });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const generoMap = { MASCULINO: "M", FEMININO: "F", OUTRO: "OUTRO" };
 
-    // Criação do usuário
+    const generoMap = {
+      MASCULINO: "M",
+      FEMININO: "F",
+      OUTRO: "OUTRO",
+    };
+
     const usuario = await prisma.usuario.create({
       data: {
         tipo_usuario,
         cargo_aluno: tipo_usuario === "ALUNO" ? cargo_aluno || "ALUNO" : null,
         nome,
         nome_social: nome_social || null,
-        num_matricula: num_matricula || null, // <- apenas se o coordenador enviar
+        num_matricula: num_matricula || null, 
         cpf,
         dataNascimento: new Date(dataNascimento),
         telefone: telefone || null,
@@ -165,15 +176,15 @@ export async function register(req, res) {
 
     const hashedId = await hashId(usuario.id);
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Usuário registrado com sucesso",
       usuario: { ...usuario, id: hashedId },
     });
   } catch (error) {
     console.error("Erro ao registrar usuário:", error);
-    res
-      .status(error.status || 500)
-      .json({ message: error.message || "Erro interno no servidor" });
+    return res.status(500).json({
+      message: error.message || "Erro interno no servidor",
+    });
   }
 }
 
@@ -425,7 +436,6 @@ async function sendPasswordResetEmail(to, token) {
 
   await transporter.sendMail(mailOptions);
 }
-
 
 export async function verifyResetCode(req, res) {
   try {
