@@ -81,7 +81,6 @@ router.get("/", authenticate, TurmaCtrl.listarTurmas);
  */
 router.post("/", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.criarTurma);
 
-
 /**
  * @openapi
  * /turmas/{id}:

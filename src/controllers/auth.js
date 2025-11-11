@@ -451,7 +451,6 @@ export async function sendPasswordResetEmail(to, token) {
   }
 }
 
-
 export async function verifyResetCode(req, res) {
   try {
 <<<<<<< HEAD
@@ -567,7 +566,6 @@ export async function requestPasswordReset(req, res) {
     return res.status(500).json({ message: "Erro interno" });
   }
 }
-
 
 export async function resetPassword(req, res) {
   try {

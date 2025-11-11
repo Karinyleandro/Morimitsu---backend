@@ -5,6 +5,10 @@ import { padraoRespostaErro } from '../validations/turma.validators.js';
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
 
+
+// atualizar os campos de turma get, add, put, tem um monte de mudanças para fazer
+
+
 async function hashId(id) {
   return await bcrypt.hash(id.toString(), SALT_ROUNDS);
 }
@@ -34,7 +38,6 @@ const listarTurmas = async (req, res) => {
   )),
   ...(q && { nome_turma: { contains: q, mode: 'insensitive' } }),
   };
-
 
     // Buscar turmas com include correto
     const turmas = await prisma.turma.findMany({
