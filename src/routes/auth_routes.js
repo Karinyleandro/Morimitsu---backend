@@ -14,7 +14,7 @@ import {
     login, 
     logout, 
     requestPasswordReset, 
-    verifyResetCode, // ✅ adicionado
+    verifyResetCode,
     resetPassword, 
     criarAluno 
 } from "../controllers/auth.js";
@@ -337,7 +337,6 @@ router.post("/verify-reset-code", verifyResetCode);
  *         description: Dados inválidos ou código incorreto
  */
 router.post("/reset-password", validateBody(resetPasswordSchema), resetPassword);
-
 
 /**
  * @openapi
