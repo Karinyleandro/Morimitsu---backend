@@ -351,7 +351,6 @@ function generateToken(length = 5) {
   return token;
 }
 
-<<<<<<< HEAD
 // Função para enviar o e-mail
 
 const OAuth2 = google.auth.OAuth2;
@@ -439,6 +438,7 @@ export async function sendPasswordResetEmail(to, token) {
               © ${new Date().getFullYear()} Morimitsu Jiu-Jitsu — Todos os direitos reservados.
             </p>
           </div>
+<<<<<<< HEAD
 =======
 
 export async function sendPasswordResetEmail(to, token) {
@@ -471,17 +471,19 @@ export async function sendPasswordResetEmail(to, token) {
             Disciplina, força e superação — até na recuperação de senha!
           </p>
 >>>>>>> c0385d1 (-correções)
+=======
+>>>>>>> 5368fc7 (-correções)
         </div>
       `,
     };
 
-<<<<<<< HEAD
     console.log("📤 Enviando email para:", to);
     await transporter.sendMail(mailOptions);
     console.log("✅ E-mail enviado com sucesso!");
   } catch (error) {
     console.error("❌ Erro ao enviar email:", error);
     throw new Error(`Falha no envio: ${error.message}`);
+<<<<<<< HEAD
 =======
         <div style="padding: 30px;">
           <p style="font-size: 16px; color: #f5f5f5; margin-bottom: 10px;">Olá, guerreiro(a)!</p>
@@ -544,6 +546,8 @@ export async function sendPasswordResetEmail(to, token) {
     console.error("❌ Erro ao enviar e-mail de recuperação:", error);
     throw new Error("Falha no envio do e-mail de recuperação.");
 >>>>>>> c0385d1 (-correções)
+=======
+>>>>>>> 5368fc7 (-correções)
   }
 }
 
