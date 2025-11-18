@@ -5,9 +5,8 @@ import { padraoRespostaErro } from '../validations/turma.validators.js';
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
 
-
+// enturmar aluno e desenturmar aluno 
 // atualizar os campos de turma get, add, put, tem um monte de mudanças para fazer
-
 
 async function hashId(id) {
   return await bcrypt.hash(id.toString(), SALT_ROUNDS);
@@ -67,6 +66,7 @@ const listarTurmas = async (req, res) => {
     return res.status(500).json({ mensagem: 'Erro ao listar turmas' });
   }
 };
+
 const criarTurma = async (req, res) => {
   try {
     if (!['COORDENADOR', 'ADMIN'].includes(req.user.tipo_usuario))
@@ -226,7 +226,6 @@ const removerTurma = async (req, res) => {
     return res.status(500).json({ mensagem: 'Erro ao deletar turma' });
   }
 };
-
 
 const adicionarAluno = async (req, res) => {
   try {

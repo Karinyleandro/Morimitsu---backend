@@ -38,7 +38,7 @@ model Usuario {
   responsaveis          Responsavel[]
   turmasComoCoordenador Turma[]              @relation("CoordenadorTurmas")
   turmasComoProfessor   Turma[]              @relation("ProfessorTurmas")
-  faixa                 Faixa?               @relation(fields: [id_faixa], references: [id])
+  faixa                 Faixa?                @relation(fields: [id_faixa], references: [id])
 }
 
 model PasswordResetToken {
@@ -108,8 +108,7 @@ model Aluno_Turma {
   frequencia_acumulada Float?  @default(0)
   ativo                Boolean @default(true)
   turma                Turma   @relation(fields: [id_turma], references: [id], onDelete: Cascade)
-  usuario              Usuario @relation(fields: [id_usuario], references: [id], onDelete: Cascade)
-
+  usuario              Usuario @relation(fields: [id_usuario], references: [id])
   @@id([id_usuario, id_turma])
 }
 
