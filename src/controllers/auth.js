@@ -93,6 +93,7 @@ export async function register(req, res) {
           "Campos obrigatórios: nome, cpf, dataNascimento, tipo_usuario, password e genero",
       });
     }
+  
 
     if (!["PROFESSOR", "COORDENADOR", "ALUNO"].includes(tipo_usuario)) {
       return res.status(400).json({ message: "Tipo de usuário inválido" });
@@ -438,9 +439,9 @@ export async function sendPasswordResetEmail(to, token) {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log("✅ E-mail de recuperação enviado para:", to);
+    console.log(" E-mail de recuperação enviado para:", to);
   } catch (error) {
-    console.error("❌ Erro ao enviar e-mail de recuperação:", error);
+    console.error(" Erro ao enviar e-mail de recuperação:", error);
     throw new Error("Falha no envio do e-mail de recuperação.");
   }
 }

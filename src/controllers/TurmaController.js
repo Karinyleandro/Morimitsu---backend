@@ -67,6 +67,9 @@ const listarTurmas = async (req, res) => {
   }
 };
 
+// eu quero refazer essa parte para adequar a forma como coloquei no figma,eu quero passar só quatro campos, e tenho que mudar o get para passar somente as informações principais
+
+
 const criarTurma = async (req, res) => {
   try {
     if (!['COORDENADOR', 'ADMIN'].includes(req.user.tipo_usuario))
