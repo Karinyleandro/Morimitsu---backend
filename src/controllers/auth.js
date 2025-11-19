@@ -9,6 +9,8 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 import nodemailer from "nodemailer";
 import { google } from "googleapis";
 
+// eu tenho que separar os usuários (eu usei uma única table para associar os usuários soq o aluno vai ter que ser outra table)
+
 const SALT_ROUNDS = 10;
 /*
 //Função para gerar número de matrícula automaticamente
