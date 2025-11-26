@@ -1,12 +1,13 @@
 import jwt from "jsonwebtoken";
-import prisma from '../prisma.js';
+import prisma from "../prisma.js";
 
-// Middleware para verificar autenticação JWT
 export async function authenticate(req, res, next) {
   try {
     const header = req.headers.authorization;
-    if (!header || !header.startsWith("Bearer "))
+
+    if (!header || !header.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Token não fornecido" });
+    }
 
     const token = header.split(" ")[1];
 
@@ -17,23 +18,39 @@ export async function authenticate(req, res, next) {
       return res.status(401).json({ message: "Token inválido ou expirado" });
     }
 
-    // Verifica se o token foi revogado
-    const revoked = await prisma.revokedToken.findUnique({ where: { jti: payload.jti } });
-    if (revoked) return res.status(401).json({ message: "Token revogado" });
+    // Verifica se foi revogado (logout)
+    const revoked = await prisma.revokedToken.findUnique({
+      where: { jti: payload.jti },
+    });
 
-    req.user = { id: payload.sub, tipo_usuario: payload.tipo_usuario, nome: payload.nome };
+    if (revoked) {
+      return res.status(401).json({ message: "Token revogado" });
+    }
+
+    // Ajustado para bater com o token criado no controller
+    req.user = {
+      id: payload.sub,
+      tipo: payload.tipo,
+      nome: payload.nome,
+    };
+
     next();
   } catch (err) {
-    console.error(err);
+    console.error("Erro no authenticate:", err);
     res.status(500).json({ message: "Erro interno" });
   }
 }
 
 export function authorize(...allowedRoles) {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: "Não autenticado" });
-    if (!allowedRoles.includes(req.user.tipo_usuario))
+    if (!req.user)
+      return res.status(401).json({ message: "Não autenticado" });
+
+    // Correção: agora usa req.user.tipo
+    if (!allowedRoles.includes(req.user.tipo)) {
       return res.status(403).json({ message: "Acesso negado" });
+    }
+
     next();
   };
 }

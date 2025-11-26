@@ -1,16 +1,19 @@
 {
   "name": "morimitsu-backend",
   "version": "1.0.0",
-  "description": "Backend Morimitsu com TypeScript, Express, Prisma, Zod e Swagger",
+  "description": "Backend Morimitsu com Express, Prisma, Zod e Swagger",
   "license": "ISC",
   "type": "module",
-  "main": "dist/server.js",
+  "main": "src/server.js",
   "scripts": {
-    "dev": "nodemon --watch src --exec ts-node-esm src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "prisma:migrate": "prisma migrate dev --name init",
-    "prisma:studio": "prisma studio"
+  "dev": "nodemon server.js",
+  "start": "node server.js",
+  "prisma:migrate": "prisma migrate dev --name init",
+  "prisma:studio": "prisma studio",
+  "seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "node prisma/seeders/index.js"
   },
   "dependencies": {
     "@prisma/client": "^6.17.1",
@@ -38,8 +41,6 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^10.0.0",
-    "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "nodemon": "^3.1.10"
   }
 }

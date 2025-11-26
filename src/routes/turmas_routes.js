@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
-import * as TurmaCtrl from "../controllers/TurmaController.js";
+import TurmaCtrl from "../controllers/TurmaController.js";
 
 const router = express.Router();
 
@@ -8,23 +8,28 @@ const router = express.Router();
  * @openapi
  * /turmas:
  *   get:
- *     summary: Lista todas as turmas
- *     tags:
- *       - Turmas
+ *     summary: Lista todas as turmas com filtros opcionais
+ *     tags: [Turmas]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: faixaEtaria
- *         schema:
- *           type: string
- *           enum: [Baby, Infantil, Mista]
- *         description: Filtra turmas por faixa etária
- *       - in: query
  *         name: q
  *         schema:
  *           type: string
- *         description: Pesquisa pelo nome da turma
+ *         description: Busca por nome da turma
+ *       - in: query
+ *         name: faixaEtariaMin
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: faixaEtariaMax
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: responsavelId
+ *         schema:
+ *           type: integer
  *       - in: query
  *         name: page
  *         schema:
@@ -37,17 +42,30 @@ const router = express.Router();
  *           default: 20
  *     responses:
  *       200:
- *         description: Lista de turmas retornada com sucesso
+ *         description: Lista de turmas
  */
 router.get("/", authenticate, TurmaCtrl.listarTurmas);
+
+/**
+ * @openapi
+ * /turmas/usuarios/filtro:
+ *   get:
+ *     summary: Lista professores e coordenadores para filtros
+ *     tags: [Turmas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de usuários retornada
+ */
+router.get("/usuarios/filtro", authenticate, TurmaCtrl.usuariosParaFiltro);
 
 /**
  * @openapi
  * /turmas:
  *   post:
  *     summary: Cria uma nova turma
- *     tags:
- *       - Turmas
+ *     tags: [Turmas]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -58,96 +76,84 @@ router.get("/", authenticate, TurmaCtrl.listarTurmas);
  *             type: object
  *             required:
  *               - nome
- *               - dataCriacao
+ *               - responsavelNome
  *               - faixaEtariaMin
  *               - faixaEtariaMax
  *             properties:
  *               nome:
  *                 type: string
- *                 example: Turma Juvenil A
- *               dataCriacao:
+ *               responsavelNome:
  *                 type: string
- *                 format: date
- *                 example: "2025-10-22"
  *               faixaEtariaMin:
  *                 type: integer
- *                 example: 6
  *               faixaEtariaMax:
  *                 type: integer
- *                 example: 10
+ *               fotoTurmaUrl:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Turma criada com sucesso
+ *       400:
+ *         description: Campos obrigatórios faltando
+ *       403:
+ *         description: Sem permissão
  */
-router.post("/", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.criarTurma);
+router.post(
+  "/",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR"),
+  TurmaCtrl.criarTurma
+);
 
 /**
  * @openapi
  * /turmas/{id}:
  *   put:
- *     summary: Atualiza os dados de uma turma
- *     tags:
- *       - Turmas
+ *     summary: Atualiza dados de uma turma
+ *     tags: [Turmas]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         description: Hash da turma a ser atualizada
  *         schema:
  *           type: string
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               nome_turma:
+ *               nome:
  *                 type: string
- *                 example: "Turma Baby"
- *               data_criacao:
+ *               faixaEtariaMin:
+ *                 type: integer
+ *               faixaEtariaMax:
+ *                 type: integer
+ *               fotoTurma:
  *                 type: string
- *                 format: date
- *                 example: "2025-10-22"
- *               faixa_etaria_min:
- *                 type: integer
- *                 example: 3
- *               faixa_etaria_max:
- *                 type: integer
- *                 example: 5
- *               total_aulas:
- *                 type: integer
- *                 example: 20
- *               id_professor:
- *                 type: integer
- *                 nullable: true
- *                 description: ID do professor responsável (opcional)
- *                 example: 12
- *               id_coordenador:
- *                 type: integer
- *                 nullable: true
- *                 description: ID do coordenador responsável (opcional)
- *                 example: 5
+ *               responsaveisIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
  *     responses:
  *       200:
  *         description: Turma atualizada com sucesso
- *       404:
- *         description: Turma, professor ou coordenador não encontrado
- *       403:
- *         description: Usuário não autorizado
  */
-
-router.put("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.editarTurma);
+router.put(
+  "/:id",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR"),
+  TurmaCtrl.editarTurma
+);
 
 /**
  * @openapi
  * /turmas/{id}:
  *   delete:
- *     summary: Remove uma turma (marca como removida e preserva histórico)
- *     tags:
- *       - Turmas
+ *     summary: Remove uma turma
+ *     tags: [Turmas]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -156,20 +162,23 @@ router.put("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.ed
  *         required: true
  *         schema:
  *           type: string
- *         description: Hash da turma a ser removida
  *     responses:
  *       200:
- *         description: Turma removida com sucesso e histórico preservado
+ *         description: Turma removida com sucesso
  */
-router.delete("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.removerTurma);
+router.delete(
+  "/:id",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR"),
+  TurmaCtrl.removerTurma
+);
 
 /**
  * @openapi
- * /turmas/{id}/adicionar-aluno:
+ * /turmas/{id}/enturmar:
  *   post:
- *     summary: Adiciona um aluno a uma turma
- *     tags:
- *       - Turmas
+ *     summary: Adiciona um aluno à turma
+ *     tags: [Turmas]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -178,7 +187,6 @@ router.delete("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl
  *         required: true
  *         schema:
  *           type: string
- *         description: Hash da turma
  *     requestBody:
  *       required: true
  *       content:
@@ -190,51 +198,54 @@ router.delete("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl
  *             properties:
  *               alunoId:
  *                 type: integer
- *                 description: ID do aluno a ser adicionado
  *     responses:
  *       200:
- *         description: Aluno adicionado à turma com sucesso
+ *         description: Aluno adicionado à turma
  */
-router.post("/:id/adicionar-aluno", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.adicionarAluno);
+router.post(
+  "/:id/enturmar",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR"),
+  TurmaCtrl.enturmarAluno
+);
 
 /**
  * @openapi
- * /turmas/{id}/remover-aluno/{alunoId}:
+ * /turmas/{id}/desenturmar/{alunoId}:
  *   delete:
- *     summary: Remove um aluno de uma turma
- *     tags:
- *       - Turmas
+ *     summary: Remove aluno da turma
+ *     tags: [Turmas]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
+ *       - name: id
+ *         in: path
  *         required: true
- *         schema:
- *           type: string
- *       - in: path
- *         name: alunoId
+ *       - name: alunoId
+ *         in: path
  *         required: true
- *         schema:
- *           type: integer
  *     responses:
  *       200:
- *         description: Aluno removido da turma com sucesso
+ *         description: Aluno removido da turma
  */
-router.delete("/:id/remover-aluno/:alunoId", authenticate, authorize("COORDENADOR", "ADMIN"), TurmaCtrl.removerAluno);
+router.delete(
+  "/:id/desenturmar/:alunoId",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR"),
+  TurmaCtrl.desenturmarAluno
+);
 
 /**
  * @openapi
  * /turmas/{id}/frequencia:
  *   post:
- *     summary: Registra frequência dos alunos em uma turma
- *     tags:
- *       - Turmas
+ *     summary: Registra frequência de uma aula
+ *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
+ *       - name: id
+ *         in: path
  *         required: true
  *         schema:
  *           type: string
@@ -250,8 +261,6 @@ router.delete("/:id/remover-aluno/:alunoId", authenticate, authorize("COORDENADO
  *             properties:
  *               data:
  *                 type: string
- *                 format: date-time
- *                 example: "2025-10-20T14:00:00Z"
  *               frequencias:
  *                 type: array
  *                 items:
@@ -268,15 +277,19 @@ router.delete("/:id/remover-aluno/:alunoId", authenticate, authorize("COORDENADO
  *       201:
  *         description: Frequência registrada com sucesso
  */
-router.post("/:id/frequencia", authenticate, authorize("COORDENADOR", "PROFESSOR", "ADMIN"), TurmaCtrl.registrarFrequencia);
+router.post(
+  "/:id/frequencia",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR"),
+  TurmaCtrl.registrarFrequencia
+);
 
 /**
  * @openapi
  * /turmas/frequencias:
  *   get:
- *     summary: Consulta frequência de alunos por turma ou individualmente
- *     tags:
- *       - Turmas
+ *     summary: Lista frequência por aluno ou turma
+ *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -284,12 +297,10 @@ router.post("/:id/frequencia", authenticate, authorize("COORDENADOR", "PROFESSOR
  *         name: turmaId
  *         schema:
  *           type: string
- *         description: Filtra por hash da turma
  *       - in: query
  *         name: alunoId
  *         schema:
  *           type: integer
- *         description: Filtra por ID do aluno
  *       - in: query
  *         name: page
  *         schema:
@@ -302,8 +313,13 @@ router.post("/:id/frequencia", authenticate, authorize("COORDENADOR", "PROFESSOR
  *           default: 50
  *     responses:
  *       200:
- *         description: Frequência retornada com sucesso
+ *         description: Frequências encontradas
  */
-router.get("/frequencias", authenticate, authorize("COORDENADOR", "PROFESSOR", "ADMIN"), TurmaCtrl.consultarFrequencias);
+router.get(
+  "/frequencias",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR"),
+  TurmaCtrl.consultarFrequencias
+);
 
 export default router;

@@ -1,12 +1,13 @@
 import prisma from "../prisma.js";
 import { validarCPF } from "../utils/validacao_cpf.js";
+import { padraoRespostaErro } from "../utils/response.js";
 
 /* 
-    Controller de Alunos
-    Regras:
-    - Apenas COORDENADOR pode criar, atualizar ou deletar alunos
-    - Alunos podem ser listados ou buscados
-
+  Controller de Alunos
+  Regras:
+  - Apenas COORDENADOR pode criar, atualizar ou deletar alunos
+  - Alunos podem ser listados ou buscados
+  - Responsável pode ser null se o aluno for maior de 18 anos
 */
 
 async function checkCoordenador(req) {
@@ -25,25 +26,25 @@ async function checkCoordenador(req) {
   return userId;
 }
 
+// Função para calcular idade
+function calcularIdade(dataNascimento) {
+  const hoje = new Date();
+  const nascimento = new Date(dataNascimento);
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const m = hoje.getMonth() - nascimento.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) idade--;
+  return idade;
+}
+
+// Criar aluno
 export async function criarAluno(req, res) {
   try {
     await checkCoordenador(req);
 
     const {
-      nome,
-      nome_social,
-      cpf,
-      dataNascimento,
-      genero,
-      num_matricula,
-      id_faixa,
-      cargo_aluno,
-      telefone,
-      endereco,
-      grau,
-      imagem_perfil_url,
-      responsaveis,
-      turmaIds,
+      nome, nome_social, cpf, dataNascimento, genero,
+      num_matricula, id_faixa, cargo_aluno, telefone,
+      endereco, grau, imagem_perfil_url, responsaveis, turmaIds
     } = req.body;
 
     if (!nome || !cpf || !dataNascimento || !genero) {
@@ -54,6 +55,8 @@ export async function criarAluno(req, res) {
 
     const existeAluno = await prisma.usuario.findFirst({ where: { cpf } });
     if (existeAluno) return res.status(409).json({ message: "Aluno já cadastrado" });
+
+    const idade = calcularIdade(dataNascimento);
 
     const generoMap = { MASCULINO: "M", FEMININO: "F", OUTRO: "OUTRO" };
 
@@ -74,7 +77,7 @@ export async function criarAluno(req, res) {
         imagem_perfil_url,
         ativo: true,
         email: `${cpf}@aluno.morimitsu.com.br`,
-        responsaveis: responsaveis?.length
+        responsaveis: (idade < 18 && responsaveis?.length)
           ? { create: responsaveis.map(r => ({
               nome: r.nome,
               telefone: r.telefone,
@@ -96,35 +99,27 @@ export async function criarAluno(req, res) {
     res.status(201).json({ message: "Aluno cadastrado com sucesso", aluno });
   } catch (error) {
     console.error("Erro criar aluno:", error);
-    res.status(error.status || 500).json({ message: error.message || "Erro interno" });
+    return padraoRespostaErro(res, error.message || "Erro ao criar aluno", error.status || 500);
   }
 }
 
+// Atualizar aluno
 export async function atualizarAluno(req, res) {
   try {
     await checkCoordenador(req);
 
     const alunoId = parseInt(req.params.id);
     const {
-      nome,
-      nome_social,
-      cpf,
-      dataNascimento,
-      genero,
-      num_matricula,
-      id_faixa,
-      cargo_aluno,
-      telefone,
-      endereco,
-      grau,
-      imagem_perfil_url,
-      responsaveis,
-      turmaIds,
-      ativo
+      nome, nome_social, cpf, dataNascimento, genero,
+      num_matricula, id_faixa, cargo_aluno, telefone,
+      endereco, grau, imagem_perfil_url, responsaveis,
+      turmaIds, ativo
     } = req.body;
 
     const alunoExistente = await prisma.usuario.findUnique({ where: { id: alunoId } });
     if (!alunoExistente) return res.status(404).json({ message: "Aluno não encontrado" });
+
+    const idade = dataNascimento ? calcularIdade(dataNascimento) : calcularIdade(alunoExistente.dataNascimento);
 
     const generoMap = { MASCULINO: "M", FEMININO: "F", OUTRO: "OUTRO" };
 
@@ -144,9 +139,9 @@ export async function atualizarAluno(req, res) {
         grau,
         imagem_perfil_url,
         ativo,
-        responsaveis: responsaveis?.length
+        responsaveis: (idade < 18 && responsaveis?.length)
           ? {
-              deleteMany: {}, // remove antigos
+              deleteMany: {},
               create: responsaveis.map(r => ({
                 nome: r.nome,
                 telefone: r.telefone,
@@ -157,7 +152,7 @@ export async function atualizarAluno(req, res) {
           : undefined,
         aluno_turmas: turmaIds?.length
           ? {
-              deleteMany: {}, // remove antigos
+              deleteMany: {},
               create: turmaIds.map(id_turma => ({ id_turma }))
             }
           : undefined
@@ -172,10 +167,11 @@ export async function atualizarAluno(req, res) {
     res.json({ message: "Aluno atualizado com sucesso", aluno: alunoAtualizado });
   } catch (error) {
     console.error("Erro atualizar aluno:", error);
-    res.status(error.status || 500).json({ message: error.message || "Erro interno" });
+    return padraoRespostaErro(res, error.message || "Erro ao atualizar aluno", error.status || 500);
   }
 }
 
+// Deletar aluno
 export async function deletarAluno(req, res) {
   try {
     await checkCoordenador(req);
@@ -188,10 +184,11 @@ export async function deletarAluno(req, res) {
     res.json({ message: "Aluno deletado com sucesso" });
   } catch (error) {
     console.error("Erro deletar aluno:", error);
-    res.status(error.status || 500).json({ message: error.message || "Erro interno" });
+    return padraoRespostaErro(res, error.message || "Erro ao deletar aluno", error.status || 500);
   }
 }
 
+// Listar alunos
 export async function listarAlunos(req, res) {
   try {
     const { nome, id } = req.query;
@@ -213,13 +210,15 @@ export async function listarAlunos(req, res) {
     res.json(alunos);
   } catch (error) {
     console.error("Erro listar alunos:", error);
-    res.status(500).json({ message: "Erro interno" });
+    return padraoRespostaErro(res, "Erro ao listar alunos", 500);
   }
 }
 
+// Listar alunos por turma
 export async function listarAlunosPorTurma(req, res) {
   try {
     const turmaId = parseInt(req.params.id);
+
     const alunos = await prisma.aluno_Turma.findMany({
       where: { id_turma: turmaId, ativo: true },
       include: { usuario: { include: { responsaveis: true, faixa: true } }, turma: true },
@@ -228,6 +227,14 @@ export async function listarAlunosPorTurma(req, res) {
     res.json(alunos.map(a => a.usuario));
   } catch (error) {
     console.error("Erro listar alunos por turma:", error);
-    res.status(500).json({ message: "Erro interno" });
+    return padraoRespostaErro(res, "Erro ao listar alunos por turma", 500);
   }
 }
+
+export default {
+  criarAluno,
+  atualizarAluno,
+  deletarAluno,
+  listarAlunos,
+  listarAlunosPorTurma
+};
