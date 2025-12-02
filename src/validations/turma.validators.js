@@ -15,9 +15,11 @@ export const padraoRespostaErro = (res, mensagem, status = 400) => {
  * Schema para criar turma
  */
 export const criarTurmaSchema = z.object({
-  nome: z.string().min(2, "O nome da turma deve ter pelo menos 2 caracteres."),
-  faixaEtaria: z.enum(["Infantil", "Fundamental"], "Faixa etária inválida."),
-  totalAulas: z.number().int().min(1, "O total de aulas deve ser positivo."),
+  nome: z.string().min(2, { message: "O nome da turma deve ter pelo menos 2 caracteres." }),
+  faixaEtaria: z.enum(["Infantil", "Fundamental"], { 
+    errorMap: () => ({ message: "Faixa etária inválida." }) 
+  }),
+  totalAulas: z.number().int().min(1, { message: "O total de aulas deve ser positivo." }),
   professorResponsavel: z.number().int().optional(),
 });
 
@@ -25,9 +27,11 @@ export const criarTurmaSchema = z.object({
  * Schema para atualizar turma
  */
 export const atualizarTurmaSchema = z.object({
-  nome: z.string().min(2, "O nome da turma deve ter pelo menos 2 caracteres.").optional(),
-  faixaEtaria: z.enum(["Infantil", "Fundamental"], "Faixa etária inválida.").optional(),
-  totalAulas: z.number().int().min(1, "O total de aulas deve ser positivo.").optional(),
+  nome: z.string().min(2, { message: "O nome da turma deve ter pelo menos 2 caracteres." }).optional(),
+  faixaEtaria: z.enum(["Infantil", "Fundamental"], { 
+    errorMap: () => ({ message: "Faixa etária inválida." }) 
+  }).optional(),
+  totalAulas: z.number().int().min(1, { message: "O total de aulas deve ser positivo." }).optional(),
   professorResponsavel: z.number().int().optional(),
 });
 
@@ -35,14 +39,17 @@ export const atualizarTurmaSchema = z.object({
  * Schema para adicionar aluno à turma
  */
 export const adicionarAlunoTurmaSchema = z.object({
-  alunoId: z.number().int("ID de aluno inválido."),
+  alunoId: z.number().int({ message: "ID de aluno inválido." }),
 });
 
 /**
  * Schema para registrar frequência
  */
 export const registrarFrequenciaSchema = z.object({
-  data: z.string().datetime("Data inválida."),
+  data: z.string().refine(
+    (val) => !isNaN(Date.parse(val)),
+    { message: "Data inválida." }
+  ),
   frequencias: z
     .array(
       z.object({
@@ -50,7 +57,7 @@ export const registrarFrequenciaSchema = z.object({
         presente: z.boolean(),
       })
     )
-    .nonempty("É necessário registrar ao menos uma frequência."),
+    .nonempty({ message: "É necessário registrar ao menos uma frequência." }),
 });
 
 /**

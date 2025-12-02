@@ -1,34 +1,43 @@
 import express from "express";
 const router = express.Router();
+
 import { validateBody } from "../middlewares/zodMiddleware.js";
 
-import { 
-    registerSchema, 
-    loginSchema, 
-    requestResetSchema, 
-    resetPasswordSchema, 
-    criarAlunoSchema 
+import {
+  registerSchema,
+  loginSchema,
+  requestResetSchema,
+  resetPasswordSchema,
+  verifyResetCodeSchema
 } from "../validations/auth.validators.js";
-import { 
-    register, 
-    login, 
-    logout, 
-    requestPasswordReset, 
-    verifyResetCode,
-    resetPassword, 
-    criarAluno 
+
+
+import {
+  register,
+  login,
+  logout,
+  requestPasswordReset,
+  verifyResetCode,
+  resetPassword
 } from "../controllers/auth.js";
+
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 
 /**
  * @openapi
  * /auth/register:
  *   post:
- *     summary: Registrar um novo usuário (PROFESSOR, COORDENADOR ou ALUNO)
- *     description: 
- *       Apenas **coordenadores logados** podem criar novos usuários.  
- *       Permite cadastrar professores, coordenadores ou alunos (sem acesso ao sistema).  
- *       O campo **num_matricula** é opcional e pode ser informado manualmente pelo coordenador.
+ *     summary: Registrar um novo usuário do sistema
+ *     description: |
+ *       Apenas **COORDENADORES** podem criar novos usuários que têm acesso ao sistema.
+ *
+ *       Tipos permitidos:
+ *       - **ADMIN**
+ *       - **PROFESSOR**
+ *       - **COORDENADOR**
+ *
+ *       ⚠ **Alunos não são criados aqui** → use `/alunos`.
+ *
  *     tags:
  *       - auth
  *     security:
@@ -41,68 +50,49 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *             type: object
  *             required:
  *               - nome
- *               - cpf
- *               - dataNascimento
- *               - tipo_usuario
- *               - genero
+ *               - email
  *               - password
+ *               - tipo
+ *               - genero
  *             properties:
  *               nome:
  *                 type: string
- *                 example: João Silva
- *               cpf:
- *                 type: string
- *                 example: 12345678909
- *               dataNascimento:
- *                 type: string
- *                 format: date
- *                 example: 1990-05-15
- *               tipo_usuario:
- *                 type: string
- *                 enum: [PROFESSOR, COORDENADOR, ALUNO]
- *                 example: ALUNO
- *               genero:
- *                 type: string
- *                 enum: [MASCULINO, FEMININO, OUTRO]
- *                 example: MASCULINO
- *               password:
- *                 type: string
- *                 example: Senha@123
- *                 description: Necessário apenas se o usuário tiver acesso ao sistema.
- *               email:
- *                 type: string
- *                 nullable: true
- *                 example: joao@email.com
+ *                 example: "Renato José de Souza"
  *               nome_social:
  *                 type: string
  *                 nullable: true
- *                 example: Joãozinho Silva
+ *                 example: "Renatinho"
+ *               cpf:
+ *                 type: string
+ *                 example: "123.456.789-00"
+ *               dataNascimento:
+ *                 type: string
+ *                 format: date
+ *                 example: "2008-12-07"
  *               telefone:
  *                 type: string
- *                 nullable: true
- *                 example: "(11) 99999-9999"
+ *                 example: "(88) 99583-8843"
  *               endereco:
  *                 type: string
- *                 nullable: true
- *                 example: "Rua das Flores, 123 - São Paulo/SP"
- *               grau:
- *                 type: integer
- *                 nullable: true
- *                 example: 2
+ *                 example: "Rua Obi Juci Diniz, 153 - Prado"
+ *               genero:
+ *                 type: string
+ *                 enum: [MASCULINO, FEMININO, OUTRO]
+ *                 example: "MASCULINO"
  *               imagem_perfil_url:
  *                 type: string
  *                 nullable: true
- *                 example: "https://cdn.morimitsu.com/perfis/joao.png"
- *               cargo_aluno:
+ *                 example: "https://cdn.site.com/fotos/renato.png"
+ *               email:
  *                 type: string
- *                 nullable: true
- *                 enum: [ALUNO, ALUNO_PROFESSOR]
- *                 example: ALUNO
- *               num_matricula:
+ *                 example: "renato@gmail.com"
+ *               password:
  *                 type: string
- *                 nullable: true
- *                 example: "20241023"
- *                 description: Número de matrícula opcional. Pode ser informado manualmente pelo coordenador.
+ *                 example: "Senha@123"
+ *               tipo:
+ *                 type: string
+ *                 enum: [ADMIN, PROFESSOR, COORDENADOR]
+ *                 example: "PROFESSOR"
  *     responses:
  *       201:
  *         description: Usuário criado com sucesso
@@ -119,39 +109,48 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *                   properties:
  *                     id:
  *                       type: string
- *                       example: "abc123xyz"
+ *                       example: "aj82hsg7127sgsj2"
  *                     nome:
  *                       type: string
- *                       example: João Silva
- *                     tipo_usuario:
- *                       type: string
- *                       example: ALUNO
+ *                       example: "Renato José de Souza"
  *                     email:
  *                       type: string
- *                       example: joao@email.com
- *                     num_matricula:
+ *                       example: "renato@gmail.com"
+ *                     tipo:
  *                       type: string
- *                       example: "20241023"
- *                     genero:
- *                       type: string
- *                       example: MASCULINO
- *                     ativo:
- *                       type: boolean
- *                       example: true
+ *                       example: "PROFESSOR"
  *       403:
- *         description: Acesso negado — apenas coordenadores podem registrar novos usuários
+ *         description: Apenas coordenadores podem criar usuários
+ *       409:
+ *         description: Já existe um usuário com esse email ou CPF
  */
-router.post("/register", authenticate, authorize("COORDENADOR"), validateBody(registerSchema), register);
+router.post(
+  "/register",
+  authenticate,
+  authorize("COORDENADOR"),
+  validateBody(registerSchema),
+  register
+);
 
 /**
  * @openapi
  * /auth/login:
  *   post:
- *     summary: Login do usuário (somente COORDENADOR ou PROFESSOR)
+ *     summary: Login do usuário
  *     description: |
- *       Permite login utilizando CPF, e-mail ou número de matrícula, juntamente com a senha.  
- *       Apenas usuários com o tipo **COORDENADOR** ou **PROFESSOR** podem acessar o sistema.  
- *       Alunos sem senha ou acesso não conseguem logar.
+ *       Login permitido somente para:
+ *       - **ADMIN**
+ *       - **PROFESSOR**
+ *       - **COORDENADOR**
+ *
+ *       🚫 Alunos não podem fazer login.
+ *
+ *       O usuário pode entrar usando:
+ *       - Email  
+ *       - CPF  
+ *       - Matrícula  
+ *       - Nome  
+ *
  *     tags:
  *       - auth
  *     requestBody:
@@ -166,61 +165,17 @@ router.post("/register", authenticate, authorize("COORDENADOR"), validateBody(re
  *             properties:
  *               identifier:
  *                 type: string
- *                 description: Pode ser o e-mail, CPF, nome ou número de matrícula do usuário.
- *                 examples:
- *                   email:
- *                     summary: Exemplo com e-mail
- *                     value: joao@email.com
- *                   cpf:
- *                     summary: Exemplo com CPF
- *                     value: "89583367222"
- *                   matricula:
- *                     summary: Exemplo com número de matrícula
- *                     value: "10001"
- *                   nome:
- *                     summary: Exemplo com nome de usuário
- *                     value: "João Silva"
+ *                 description: Email, CPF, matrícula ou nome
  *               password:
  *                 type: string
- *                 example: Senha@123
+ *                 example: "Senha@123"
  *     responses:
  *       200:
- *         description: "Login realizado com sucesso"
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 token:
- *                   type: string
- *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *                 expiresIn:
- *                   type: string
- *                   example: "1h"
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       example: "user123"
- *                     nome:
- *                       type: string
- *                       example: "João Silva"
- *                     tipo_usuario:
- *                       type: string
- *                       example: "PROFESSOR"
- *                     email:
- *                       type: string
- *                       example: "joao@email.com"
- *                     genero:
- *                       type: string
- *                       example: "MASCULINO"
+ *         description: Login bem-sucedido
  *       401:
- *         description: "Credenciais inválidas"
+ *         description: Credenciais inválidas
  *       403:
- *         description: "Usuário sem acesso ao sistema (ex: ALUNO)"
- *       500:
- *         description: "Erro interno no servidor"
+ *         description: Usuário não possui permissão de acesso
  */
 router.post("/login", validateBody(loginSchema), login);
 
@@ -229,13 +184,14 @@ router.post("/login", validateBody(loginSchema), login);
  * /auth/logout:
  *   post:
  *     summary: Logout do usuário
+ *     description: Invalida o token atual.
  *     tags:
  *       - auth
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Logout efetuado
+ *         description: Logout realizado com sucesso
  */
 router.post("/logout", authenticate, logout);
 
@@ -243,7 +199,8 @@ router.post("/logout", authenticate, logout);
  * @openapi
  * /auth/request-reset:
  *   post:
- *     summary: Solicitar redefinição de senha
+ *     summary: Solicitar código de recuperação de senha
+ *     description: Envia um código de 5 dígitos para o email do usuário.
  *     tags:
  *       - auth
  *     requestBody:
@@ -257,19 +214,22 @@ router.post("/logout", authenticate, logout);
  *             properties:
  *               identifier:
  *                 type: string
- *                 example: joao@email.com
+ *                 example: "renato@gmail.com"
  *     responses:
  *       200:
- *         description: E-mail de recuperação enviado
+ *         description: Código de recuperação enviado
  */
-router.post("/request-reset", validateBody(requestResetSchema), requestPasswordReset);
+router.post(
+  "/request-reset",
+  validateBody(requestResetSchema),
+  requestPasswordReset
+);
 
 /**
  * @openapi
  * /auth/verify-reset-code:
  *   post:
- *     summary: Verificar código de recuperação de senha
- *     description: Confirma se o código informado é válido, ainda não foi utilizado e não expirou.
+ *     summary: Verificar validade do código de recuperação
  *     tags:
  *       - auth
  *     requestBody:
@@ -279,6 +239,7 @@ router.post("/request-reset", validateBody(requestResetSchema), requestPasswordR
  *           schema:
  *             type: object
  *             required:
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
  *               - codigoRecuperacao:
@@ -294,32 +255,31 @@ router.post("/request-reset", validateBody(requestResetSchema), requestPasswordR
  *             properties:
  *               codigoRecuperacao:
 >>>>>>> 1ff2d03 (organizando documentáção - ainda falta muitas coisinhas)
+=======
+ *               - code
+ *             properties:
+ *               code:
+>>>>>>> 97963f4 (teste)
  *                 type: string
  *                 example: "12345"
  *     responses:
  *       200:
  *         description: Código válido
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Código válido
- *                 userId:
- *                   type: integer
- *                   example: 10
  *       400:
  *         description: Código inválido ou expirado
  */
-router.post("/verify-reset-code", verifyResetCode);
+router.post(
+  "/verify-reset-code",
+  validateBody(verifyResetCodeSchema),
+  verifyResetCode
+);
+
 
 /**
  * @openapi
  * /auth/reset-password:
  *   post:
- *     summary: Resetar senha do usuário
+ *     summary: Resetar senha utilizando código enviado por e-mail
  *     tags:
  *       - auth
  *     requestBody:
@@ -331,115 +291,37 @@ router.post("/verify-reset-code", verifyResetCode);
  *             required:
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
  *               - codigoRecuperacao
 >>>>>>> a46d2d5 (token com apenas numeros)
 =======
 >>>>>>> c23afbd (corrigindo doc-api)
+=======
+ *               - code
+>>>>>>> 97963f4 (teste)
  *               - newPassword
  *               - confirmPassword
  *             properties:
- *               codigoRecuperacao:
+ *               code:
  *                 type: string
- *                 example: "69613"
+ *                 example: "12345"
  *               newPassword:
  *                 type: string
  *                 example: "NovaSenha@123"
  *               confirmPassword:
  *                 type: string
  *                 example: "NovaSenha@123"
- *             description: Informe **token** (do link) ou **codigoRecuperacao** (enviado por e-mail)
  *     responses:
  *       200:
  *         description: Senha atualizada com sucesso
  *       400:
- *         description: Dados inválidos ou código incorreto
+ *         description: Código inválido ou senhas não coincidem
  */
-router.post("/reset-password", validateBody(resetPasswordSchema), resetPassword);
-
-/**
- * @openapi
- * /alunos:
- *   post:
- *     summary: Criar um novo aluno (apenas coordenador)
- *     tags:
- *       - alunos
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - nome
- *               - cpf
- *               - dataNascimento
- *               - genero
- *             properties:
- *               nome:
- *                 type: string
- *                 example: João da Silva
- *               nome_social:
- *                 type: string
- *                 example: Joãozinho
- *               cpf:
- *                 type: string
- *                 example: 12345678909
- *               dataNascimento:
- *                 type: string
- *                 format: date
- *                 example: 2010-03-25
- *               genero:
- *                 type: string
- *                 enum: [MASCULINO, FEMININO, OUTRO]
- *                 example: MASCULINO
- *               num_matricula:
- *                 type: string
- *                 example: 20231001
- *               id_faixa:
- *                 type: number
- *                 example: 2
- *               cargo_aluno:
- *                 type: string
- *                 example: Aluno Regular
- *               telefone:
- *                 type: string
- *                 example: "+55 11 91234-5678"
- *               endereco:
- *                 type: string
- *                 example: "Rua Exemplo, 123, São Paulo"
- *               grau:
- *                 type: string
- *                 example: "Faixa Branca"
- *               imagem_perfil_url:
- *                 type: string
- *                 example: "https://link-da-imagem.com/foto.jpg"
- *               responsaveis:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     nome:
- *                       type: string
- *                     telefone:
- *                       type: string
- *                     grau_parentesco:
- *                       type: string
- *                     email:
- *                       type: string
- *               turmaIds:
- *                 type: array
- *                 items:
- *                   type: number
- *               acessoSistema:
- *                 type: boolean
- *                 example: false
- *     responses:
- *       201:
- *         description: Aluno cadastrado com sucesso
- */
-router.post("/alunos", authenticate, authorize("COORDENADOR"), criarAluno);
+router.post(
+  "/reset-password",
+  validateBody(resetPasswordSchema),
+  resetPassword
+);
 
 export default router;

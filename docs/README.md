@@ -48,16 +48,16 @@ O projeto segue o padrão **Model–View–Controller (MVC)**, garantindo separa
 ```yaml
 setup:
   steps:
-    - step: "1️⃣ Clonar o repositório"
+    - step: "1️ Clonar o repositório"
       command: |
         git clone https://github.com/Karinyleandro/Morimitsu---backend.git
         cd Morimitsu---backend
 
-    - step: "2️⃣ Instalar dependências"
+    - step: "2️ Instalar dependências"
       command: |
         npm install
 
-    - step: "3️⃣ Configurar o ambiente"
+    - step: "3️ Configurar o ambiente"
       description: "Crie um arquivo .env na raiz do projeto com as seguintes variáveis:"
       env_file:
         DATABASE_URL: "postgresql://postgres.iwvzkazexfifcvdadyol:morimitsu123@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
@@ -69,11 +69,11 @@ setup:
         EMAIL_HOST: "smtp.gmail.com"
         EMAIL_PORT: 587
 
-    - step: "4️⃣ Rodar as migrações do Prisma"
+    - step: "4️ Rodar as migrações do Prisma"
       command: |
         npx prisma migrate dev
 
-    - step: "5️⃣ Iniciar o servidor"
+    - step: "5️ Iniciar o servidor"
       command: |
         node server.js
       note: "O servidor será iniciado em: http://localhost:3000"
@@ -103,3 +103,4 @@ deploy:
     EMAIL_PASS: "ggty llud wnjm vkjz"
     EMAIL_HOST: "smtp.gmail.com"
     EMAIL_PORT: 587
+
