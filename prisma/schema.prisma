@@ -19,10 +19,15 @@ enum TipoUsuario {
   COORDENADOR
 }
 
+enum TipoAluno {
+  COMUM
+  ALUNO_PROFESSOR
+}
+
+
 model Usuario {
-  id                Int              @id @default(autoincrement())
+  id                String           @id @default(uuid())
   
-  // Campos em comum com aluno
   nome              String
   nome_social       String?
   cpf               String?          @unique
@@ -32,21 +37,17 @@ model Usuario {
   genero            Genero?
   imagem_perfil_url String?
 
-  // Campos exclusivos de usuario
   email             String?          @unique
   passwordHash      String?
   tipo              TipoUsuario?
   ativo             Boolean          @default(true)
   ultimo_login      DateTime?
 
-  // Datas
   criado_em         DateTime         @default(now())
   atualizado_em     DateTime         @default(now())
 
-  // Relação reversa com aluno
   aluno             Aluno?           @relation("AlunoUsuario")
 
-  // Outras relações
   turmasComoCoordenador Turma[]      @relation("CoordenadorTurmas")
   turmasComoProfessor   Turma[]      @relation("ProfessorTurmas")
   registradas           Frequencia[] @relation("RegistradorFrequencias")
@@ -56,66 +57,67 @@ model Usuario {
 }
 
 model Aluno {
-  id                Int              @id @default(autoincrement())
+  id                String   @id @default(uuid())
 
-  // Campos compartilhados
   nome              String
   nome_social       String?
-  cpf               String?          @unique
+  cpf               String?  @unique
   dataNascimento    DateTime?
   telefone          String?
   endereco          String?
   genero            Genero?
   imagem_perfil_url String?
 
-  // Campos exclusivos de aluno
-  num_matricula     String?          @unique
-  id_faixa          Int?
+  num_matricula     String?  @unique
+
+  id_faixa          String?
   grau              Int?
 
-  // Relacionamento com Usuario para permitir "promoção"
-  usuarioId         Int?      @unique
-  usuario           Usuario?  @relation("AlunoUsuario", fields: [usuarioId], references: [id])
+  tipo              TipoAluno @default(COMUM)  
 
-  // Datas
-  criado_em         DateTime         @default(now())
-  atualizado_em     DateTime         @default(now())
+  usuarioId         String? @unique
+  usuario           Usuario? @relation("AlunoUsuario", fields: [usuarioId], references: [id])
 
-  // Relações
-  faixa              Faixa?           @relation(fields: [id_faixa], references: [id])
-  responsaveis       Responsavel[]
-  turma_matriculas   Aluno_Turma[]
-  graduacoes         Graduacao[]
-  frequencias        Frequencia[]     @relation("AlunoFrequencias")
+
+  criado_em         DateTime @default(now())
+  atualizado_em     DateTime @default(now()) @updatedAt
+
+  faixa             Faixa?   @relation(fields: [id_faixa], references: [id])
+  responsaveis      Responsavel[]
+  turma_matriculas  Aluno_Turma[]
+  graduacoes        Graduacao[]
+  frequencias       Frequencia[] @relation("AlunoFrequencias")
+
+  @@index([usuarioId])
 }
 
+
+
 model Responsavel {
-  id              Int     @id @default(autoincrement())
+  id              String   @id @default(uuid())
   nome            String
   telefone        String
   grau_parentesco String
   email           String?
-  alunoId         Int
+  alunoId         String
 
-  aluno           Aluno   @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  aluno           Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
 }
 
-
 model Faixa {
-  id               Int              @id @default(autoincrement())
+  id               String   @id @default(uuid())
   nome             String
-  ordem            Int    
+  ordem            Int      @unique
   imagem_faixa_url String?
-
-  graduacoes       Graduacao[]
+  
   requisitos       Requisito_Grau[]
+  graduacoes       Graduacao[]
   alunos           Aluno[]
 }
 
-
 model Requisito_Grau {
-  id                Int     @id @default(autoincrement())
-  faixa_id          Int
+  id                String  @id @default(uuid())
+  faixa_id          String
   grau              Int
   requisito_aulas   Int
   tempo_minimo_dias Int
@@ -125,18 +127,18 @@ model Requisito_Grau {
 }
 
 model Turma {
-  id                  Int                 @id @default(autoincrement())
+  id                  String              @id @default(uuid())
   nome_turma          String
   data_criacao        DateTime?           @default(now())
   faixa_etaria_min    Int
   faixa_etaria_max    Int
   total_aulas         Int?
 
-  id_professor        Int?
-  id_coordenador      Int?
+  id_professor        String?
+  id_coordenador      String?
   ativo               Boolean?            @default(true)
 
-  imagem_turma_url    String?           
+  imagem_turma_url    String?
   
   aluno_turmas        Aluno_Turma[]
   frequencias         Frequencia[]
@@ -146,12 +148,10 @@ model Turma {
   professor           Usuario?            @relation("ProfessorTurmas", fields: [id_professor], references: [id])
 }
 
-
-
 model TurmaResponsavel {
-  id        Int      @id @default(autoincrement())
-  turmaId   Int
-  usuarioId Int
+  id        String   @id @default(uuid())
+  turmaId   String
+  usuarioId String
   criado_em DateTime @default(now())
 
   turma     Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
@@ -161,8 +161,8 @@ model TurmaResponsavel {
 }
 
 model Aluno_Turma {
-  id_aluno             Int
-  id_turma             Int
+  id_aluno             String
+  id_turma             String
   frequencia_acumulada Float?  @default(0)
   ativo                Boolean @default(true)
 
@@ -173,10 +173,10 @@ model Aluno_Turma {
 }
 
 model Frequencia {
-  id             Int      @id @default(autoincrement())
-  id_turma       Int
-  id_aluno       Int
-  id_registrador Int
+  id             String   @id @default(uuid())
+  id_turma       String
+  id_aluno       String
+  id_registrador String
   data_aula      DateTime
   presente       Boolean
   criado_em      DateTime @default(now())
@@ -187,9 +187,9 @@ model Frequencia {
 }
 
 model Graduacao {
-  id             Int      @id @default(autoincrement())
-  alunoId        Int
-  faixa_id       Int
+  id             String   @id @default(uuid())
+  alunoId        String
+  faixa_id       String
   grau           Int
   data_graduacao DateTime
   observacao     String?
@@ -199,23 +199,22 @@ model Graduacao {
 }
 
 model PasswordResetToken {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   token     String   @unique
-  userId    Int
+  userId    String
   expiresAt DateTime
   user      Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-
 model RevokedToken {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   jti       String   @unique
   expiresAt DateTime
 }
 
 model Log_Acao {
-  id            Int      @id @default(autoincrement())
-  usuario_id    Int?
+  id            String   @id @default(uuid())
+  usuario_id    String?
   acao          String
   descricao     String?
   data_execucao DateTime @default(now())

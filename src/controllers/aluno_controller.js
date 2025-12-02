@@ -108,7 +108,8 @@ export async function atualizarAluno(req, res) {
   try {
     await checkCoordenador(req);
 
-    const alunoId = parseInt(req.params.id);
+    const alunoId = req.params.id; // UUID → string
+
     const {
       nome, nome_social, cpf, dataNascimento, genero,
       num_matricula, id_faixa, cargo_aluno, telefone,
@@ -176,7 +177,8 @@ export async function deletarAluno(req, res) {
   try {
     await checkCoordenador(req);
 
-    const alunoId = parseInt(req.params.id);
+    const alunoId = req.params.id; // UUID
+
     const alunoExistente = await prisma.usuario.findUnique({ where: { id: alunoId } });
     if (!alunoExistente) return res.status(404).json({ message: "Aluno não encontrado" });
 
@@ -195,7 +197,7 @@ export async function listarAlunos(req, res) {
 
     const filtros = {};
     if (nome) filtros.nome = { contains: nome, mode: "insensitive" };
-    if (id) filtros.id = parseInt(id);
+    if (id) filtros.id = id; // UUID
 
     const alunos = await prisma.usuario.findMany({
       where: { tipo_usuario: "ALUNO", ...filtros },
@@ -217,7 +219,7 @@ export async function listarAlunos(req, res) {
 // Listar alunos por turma
 export async function listarAlunosPorTurma(req, res) {
   try {
-    const turmaId = parseInt(req.params.id);
+    const turmaId = req.params.id; // UUID
 
     const alunos = await prisma.aluno_Turma.findMany({
       where: { id_turma: turmaId, ativo: true },

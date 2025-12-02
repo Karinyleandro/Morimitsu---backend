@@ -1,21 +1,13 @@
-import { PrismaClient } from '@prisma/client';
-import { seedUsuarios } from './usuarios.js'; // Importa corretamente a função
-
-const prisma = new PrismaClient();
+import { seedUsuarios } from "./usuarios.js";
+import { seedFaixas } from "./faixas.js";
 
 async function main() {
   console.log(" Iniciando seeders...");
-  
-  await seedUsuarios(); // Executa o seeder de usuários
+
+  await seedUsuarios();
+  await seedFaixas();
 
   console.log(" Seeders finalizados!");
 }
 
-main()
-  .catch(e => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main();

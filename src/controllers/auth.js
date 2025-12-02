@@ -8,7 +8,6 @@ import nodemailer from "nodemailer";
 
 const SALT_ROUNDS = 10;
 
-
 function validarSenhaForte(senha) {
   if (typeof senha !== "string") return "Senha inválida";
   if (senha.length < 8) return "A senha deve ter no mínimo 8 caracteres";
@@ -25,10 +24,6 @@ function createJwt(payload) {
     jwtid: jti,
   });
   return { token, jti };
-}
-
-async function hashId(id) {
-  return bcrypt.hash(id.toString(), SALT_ROUNDS);
 }
 
 function verificarDominioEmail(email) {
@@ -65,7 +60,7 @@ export async function register(req, res) {
       imagem_perfil_url,
       email,
       password,
-      tipo, // ADMIN / PROFESSOR / COORDENADOR
+      tipo,
     } = req.body;
 
     if (!nome || !email || !password || !tipo) {
@@ -79,17 +74,12 @@ export async function register(req, res) {
       return res.status(400).json({ message: "Tipo inválido" });
     }
 
-    // Validar senha
     const senhaValida = validarSenhaForte(password);
     if (senhaValida !== true) return res.status(400).json({ message: senhaValida });
 
-    // Checar se existem coordenadores no sistema
-    const totalCoordenadores = await prisma.usuario.count({
-      where: { tipo: "COORDENADOR" },
-    });
+    const totalCoordenadores = await prisma.usuario.count({ where: { tipo: "COORDENADOR" } });
 
     if (totalCoordenadores > 0) {
-      // Só COORDENADORES podem criar novos usuários
       const authHeader = req.headers.authorization;
       if (!authHeader) return res.status(403).json({ message: "Acesso negado" });
 
@@ -105,20 +95,18 @@ export async function register(req, res) {
         return res.status(403).json({ message: "Acesso negado" });
       }
     } else {
-      // Permitido criar o primeiro coordenador sem token
       if (tipo !== "COORDENADOR") {
         return res.status(400).json({ message: "O primeiro usuário deve ser COORDENADOR" });
       }
     }
 
-    // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email))
       return res.status(400).json({ message: "Formato de e-mail inválido" });
 
-    // Verificar usuário existente
     const existingWhere = [{ email }];
     if (cpf) existingWhere.push({ cpf });
+
     const existente = await prisma.usuario.findFirst({
       where: { OR: existingWhere },
     });
@@ -126,8 +114,8 @@ export async function register(req, res) {
     if (existente)
       return res.status(409).json({ message: "Já existe um usuário com esse email/CPF" });
 
-    // Criar hash da senha e salvar
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
     const user = await prisma.usuario.create({
       data: {
         nome,
@@ -144,11 +132,9 @@ export async function register(req, res) {
       },
     });
 
-    const hashedId = await hashId(user.id);
-
     return res.status(201).json({
       message: "Usuário criado com sucesso",
-      usuario: { ...user, id: hashedId },
+      usuario: user, 
     });
   } catch (e) {
     console.error("Erro no registro:", e);
@@ -170,7 +156,6 @@ export async function login(req, res) {
     if (!user || !user.passwordHash)
       return res.status(401).json({ message: "Credenciais inválidas" });
 
-    // Apenas ADMIN, PROFESSOR, COORDENADOR
     if (!["ADMIN", "PROFESSOR", "COORDENADOR"].includes(user.tipo))
       return res.status(403).json({ message: "Usuário sem permissão de login" });
 
@@ -188,12 +173,10 @@ export async function login(req, res) {
       nome: user.nome,
     });
 
-    const hashed = await hashId(user.id);
-
     return res.status(200).json({
       token,
       expiresIn: process.env.JWT_EXPIRES_IN,
-      user: { ...user, id: hashed },
+      user, // ← ID já é UUID
     });
   } catch (e) {
     console.error("Erro no login:", e);
@@ -228,6 +211,7 @@ export async function logout(req, res) {
     return res.status(500).json({ message: "Erro interno" });
   }
 }
+
 
 async function sendPasswordResetEmail(to, code) {
   const transporter = nodemailer.createTransport({
@@ -348,8 +332,6 @@ async function sendPasswordResetEmail(to, code) {
     html,
   });
 }
-
-
 
 export async function requestPasswordReset(req, res) {
   try {
