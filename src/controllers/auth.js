@@ -5,11 +5,6 @@ import prisma from "../prisma.js";
 import dns from "node:dns";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
-<<<<<<< HEAD
-
-const SALT_ROUNDS = 10;
-
-=======
 
 // eu tenho que separar os usuários (eu usei uma única table para associar os usuários soq o aluno vai ter que ser outra table)
 
@@ -21,7 +16,6 @@ const generoMap = {
   O: "OUTRO"
 };
 
->>>>>>> main
 function validarSenhaForte(senha) {
   if (typeof senha !== "string") return "Senha inválida";
   if (senha.length < 8) return "A senha deve ter no mínimo 8 caracteres";

@@ -2,11 +2,11 @@
 CREATE TYPE "Genero" AS ENUM ('M', 'F', 'OUTRO');
 
 -- CreateEnum
-CREATE TYPE "TipoUsuario" AS ENUM ('ADMIN', 'PROFESSOR', 'COORDENADOR');
+CREATE TYPE "TipoUsuario" AS ENUM ('ADMIN', 'PROFESSOR', 'COORDENADOR', 'ALUNO', 'ALUNO_PROFESSOR');
 
 -- CreateTable
 CREATE TABLE "Usuario" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "nome" TEXT NOT NULL,
     "nome_social" TEXT,
     "cpf" TEXT,
@@ -17,9 +17,12 @@ CREATE TABLE "Usuario" (
     "imagem_perfil_url" TEXT,
     "email" TEXT,
     "passwordHash" TEXT,
-    "tipo" "TipoUsuario",
+    "tipo" "TipoUsuario" NOT NULL,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "ultimo_login" TIMESTAMP(3),
+    "id_faixa" TEXT,
+    "grau" INTEGER,
+    "num_matricula" TEXT,
     "criado_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizado_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -27,41 +30,20 @@ CREATE TABLE "Usuario" (
 );
 
 -- CreateTable
-CREATE TABLE "Aluno" (
-    "id" SERIAL NOT NULL,
-    "nome" TEXT NOT NULL,
-    "nome_social" TEXT,
-    "cpf" TEXT,
-    "dataNascimento" TIMESTAMP(3),
-    "telefone" TEXT,
-    "endereco" TEXT,
-    "genero" "Genero",
-    "imagem_perfil_url" TEXT,
-    "num_matricula" TEXT,
-    "id_faixa" INTEGER,
-    "grau" INTEGER,
-    "usuarioId" INTEGER,
-    "criado_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "atualizado_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "Aluno_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "Responsavel" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "nome" TEXT NOT NULL,
     "telefone" TEXT NOT NULL,
     "grau_parentesco" TEXT NOT NULL,
     "email" TEXT,
-    "alunoId" INTEGER NOT NULL,
+    "alunoId" TEXT NOT NULL,
 
     CONSTRAINT "Responsavel_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Faixa" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "nome" TEXT NOT NULL,
     "ordem" INTEGER NOT NULL,
     "imagem_faixa_url" TEXT,
@@ -71,8 +53,8 @@ CREATE TABLE "Faixa" (
 
 -- CreateTable
 CREATE TABLE "Requisito_Grau" (
-    "id" SERIAL NOT NULL,
-    "faixa_id" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "faixa_id" TEXT NOT NULL,
     "grau" INTEGER NOT NULL,
     "requisito_aulas" INTEGER NOT NULL,
     "tempo_minimo_dias" INTEGER NOT NULL,
@@ -83,23 +65,34 @@ CREATE TABLE "Requisito_Grau" (
 
 -- CreateTable
 CREATE TABLE "Turma" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "nome_turma" TEXT NOT NULL,
-    "data_criacao" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "data_criacao" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "faixa_etaria_min" INTEGER NOT NULL,
     "faixa_etaria_max" INTEGER NOT NULL,
-    "total_aulas" INTEGER NOT NULL,
-    "id_professor" INTEGER,
-    "id_coordenador" INTEGER,
-    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "total_aulas" INTEGER,
+    "id_professor" TEXT,
+    "id_coordenador" TEXT,
+    "ativo" BOOLEAN DEFAULT true,
+    "imagem_turma_url" TEXT,
 
     CONSTRAINT "Turma_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+CREATE TABLE "TurmaResponsavel" (
+    "id" TEXT NOT NULL,
+    "turmaId" TEXT NOT NULL,
+    "usuarioId" TEXT NOT NULL,
+    "criado_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TurmaResponsavel_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Aluno_Turma" (
-    "id_aluno" INTEGER NOT NULL,
-    "id_turma" INTEGER NOT NULL,
+    "id_aluno" TEXT NOT NULL,
+    "id_turma" TEXT NOT NULL,
     "frequencia_acumulada" DOUBLE PRECISION DEFAULT 0,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
 
@@ -108,10 +101,10 @@ CREATE TABLE "Aluno_Turma" (
 
 -- CreateTable
 CREATE TABLE "Frequencia" (
-    "id" SERIAL NOT NULL,
-    "id_turma" INTEGER NOT NULL,
-    "id_aluno" INTEGER NOT NULL,
-    "id_registrador" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "id_turma" TEXT NOT NULL,
+    "id_aluno" TEXT NOT NULL,
+    "id_registrador" TEXT NOT NULL,
     "data_aula" TIMESTAMP(3) NOT NULL,
     "presente" BOOLEAN NOT NULL,
     "criado_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -121,9 +114,9 @@ CREATE TABLE "Frequencia" (
 
 -- CreateTable
 CREATE TABLE "Graduacao" (
-    "id" SERIAL NOT NULL,
-    "alunoId" INTEGER NOT NULL,
-    "faixa_id" INTEGER NOT NULL,
+    "id" TEXT NOT NULL,
+    "alunoId" TEXT NOT NULL,
+    "faixa_id" TEXT NOT NULL,
     "grau" INTEGER NOT NULL,
     "data_graduacao" TIMESTAMP(3) NOT NULL,
     "observacao" TEXT,
@@ -133,9 +126,9 @@ CREATE TABLE "Graduacao" (
 
 -- CreateTable
 CREATE TABLE "PasswordResetToken" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "token" TEXT NOT NULL,
-    "userId" INTEGER NOT NULL,
+    "userId" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
@@ -143,7 +136,7 @@ CREATE TABLE "PasswordResetToken" (
 
 -- CreateTable
 CREATE TABLE "RevokedToken" (
-    "id" SERIAL NOT NULL,
+    "id" TEXT NOT NULL,
     "jti" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
 
@@ -152,8 +145,8 @@ CREATE TABLE "RevokedToken" (
 
 -- CreateTable
 CREATE TABLE "Log_Acao" (
-    "id" SERIAL NOT NULL,
-    "usuario_id" INTEGER,
+    "id" TEXT NOT NULL,
+    "usuario_id" TEXT,
     "acao" TEXT NOT NULL,
     "descricao" TEXT,
     "data_execucao" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -168,13 +161,13 @@ CREATE UNIQUE INDEX "Usuario_cpf_key" ON "Usuario"("cpf");
 CREATE UNIQUE INDEX "Usuario_email_key" ON "Usuario"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Aluno_cpf_key" ON "Aluno"("cpf");
+CREATE UNIQUE INDEX "Usuario_num_matricula_key" ON "Usuario"("num_matricula");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Aluno_num_matricula_key" ON "Aluno"("num_matricula");
+CREATE UNIQUE INDEX "Faixa_ordem_key" ON "Faixa"("ordem");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Aluno_usuarioId_key" ON "Aluno"("usuarioId");
+CREATE UNIQUE INDEX "TurmaResponsavel_turmaId_usuarioId_key" ON "TurmaResponsavel"("turmaId", "usuarioId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("token");
@@ -183,13 +176,10 @@ CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("toke
 CREATE UNIQUE INDEX "RevokedToken_jti_key" ON "RevokedToken"("jti");
 
 -- AddForeignKey
-ALTER TABLE "Aluno" ADD CONSTRAINT "Aluno_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Usuario" ADD CONSTRAINT "Usuario_id_faixa_fkey" FOREIGN KEY ("id_faixa") REFERENCES "Faixa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Aluno" ADD CONSTRAINT "Aluno_id_faixa_fkey" FOREIGN KEY ("id_faixa") REFERENCES "Faixa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Responsavel" ADD CONSTRAINT "Responsavel_alunoId_fkey" FOREIGN KEY ("alunoId") REFERENCES "Aluno"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Responsavel" ADD CONSTRAINT "Responsavel_alunoId_fkey" FOREIGN KEY ("alunoId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Requisito_Grau" ADD CONSTRAINT "Requisito_Grau_faixa_id_fkey" FOREIGN KEY ("faixa_id") REFERENCES "Faixa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -201,7 +191,13 @@ ALTER TABLE "Turma" ADD CONSTRAINT "Turma_id_coordenador_fkey" FOREIGN KEY ("id_
 ALTER TABLE "Turma" ADD CONSTRAINT "Turma_id_professor_fkey" FOREIGN KEY ("id_professor") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Aluno_Turma" ADD CONSTRAINT "Aluno_Turma_id_aluno_fkey" FOREIGN KEY ("id_aluno") REFERENCES "Aluno"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TurmaResponsavel" ADD CONSTRAINT "TurmaResponsavel_turmaId_fkey" FOREIGN KEY ("turmaId") REFERENCES "Turma"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TurmaResponsavel" ADD CONSTRAINT "TurmaResponsavel_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Aluno_Turma" ADD CONSTRAINT "Aluno_Turma_id_aluno_fkey" FOREIGN KEY ("id_aluno") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Aluno_Turma" ADD CONSTRAINT "Aluno_Turma_id_turma_fkey" FOREIGN KEY ("id_turma") REFERENCES "Turma"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -213,10 +209,10 @@ ALTER TABLE "Frequencia" ADD CONSTRAINT "Frequencia_id_registrador_fkey" FOREIGN
 ALTER TABLE "Frequencia" ADD CONSTRAINT "Frequencia_id_turma_fkey" FOREIGN KEY ("id_turma") REFERENCES "Turma"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Frequencia" ADD CONSTRAINT "Frequencia_id_aluno_fkey" FOREIGN KEY ("id_aluno") REFERENCES "Aluno"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Frequencia" ADD CONSTRAINT "Frequencia_id_aluno_fkey" FOREIGN KEY ("id_aluno") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Graduacao" ADD CONSTRAINT "Graduacao_alunoId_fkey" FOREIGN KEY ("alunoId") REFERENCES "Aluno"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Graduacao" ADD CONSTRAINT "Graduacao_alunoId_fkey" FOREIGN KEY ("alunoId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Graduacao" ADD CONSTRAINT "Graduacao_faixa_id_fkey" FOREIGN KEY ("faixa_id") REFERENCES "Faixa"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
