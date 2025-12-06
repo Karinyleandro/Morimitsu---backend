@@ -55,8 +55,6 @@ function generateCode(length = 5) {
   return token;
 }
 
-<<<<<<< HEAD
-=======
 
 
 // Função auxiliar para calcular idade
@@ -73,7 +71,6 @@ function calcularIdade(dataNascimento) {
 }
 
 
->>>>>>> main
 export async function register(req, res) {
   try {
     console.log("===== [DEBUG] INÍCIO REGISTER =====");
@@ -85,7 +82,6 @@ export async function register(req, res) {
       cpf,
       dataNascimento,
       telefone,
-<<<<<<< HEAD
       telefone_responsavel,
       endereco,
       genero,
@@ -176,102 +172,9 @@ export async function register(req, res) {
         nome_social,
         cpf,
         dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
-=======
-      endereco,
-      genero,
-      imagem_perfil_url,
-
-      // login
-      email,
-      password,
-      cargo,
-
-      // campos de aluno
-      num_matricula,
-      id_faixa,
-      grau,
-      responsaveis,
-      turmaIds
-    } = req.body;
-
-    // -------- 1. Validar campos básicos do usuário --------
-    if (!nome || !cpf || !dataNascimento || !genero || !email || !password || !cargo) {
-      return res.status(400).json({ message: "Campos obrigatórios ausentes." });
-    }
-
-    if (!validarCPF(cpf)) {
-      return res.status(400).json({ message: "CPF inválido." });
-    }
-
-    if (!generoMap[genero]) {
-      return res.status(400).json({ message: "Gênero inválido." });
-    }
-
-    // -------- 2. Verificar duplicidade de CPF --------
-    const existe = await prisma.usuario.findFirst({ where: { cpf } });
-    if (existe) {
-      return res.status(409).json({ message: "CPF já cadastrado." });
-    }
-
-    // -------- 3. Criar usuário --------
-    console.log("[DEBUG] Criando usuário...");
-
-    const usuario = await prisma.usuario.create({
-      data: {
-        nome,
-        nome_social,
-        cpf,
-        dataNascimento: new Date(dataNascimento),
-        genero: generoMap[genero],
-        telefone,
-        endereco,
-        imagem_perfil_url,
-        email,
-        password,   // assumindo que já está hash
-        cargo
-      }
-    });
-
-    console.log("[DEBUG] Usuário criado:", usuario.id);
-
-    // ----------------------------------------------------------------------
-    //      SE CARGO FOR "ALUNO", CRIA O ALUNO AUTOMATICAMENTE
-    // ----------------------------------------------------------------------
-    let alunoCriado = null;
-
-    if (cargo === "ALUNO") {
-      console.log("[DEBUG] Criando aluno...");
-
-      // normalizações
-      num_matricula = tratarVazio(num_matricula);
-      id_faixa = tratarVazio(id_faixa);
-      imagem_perfil_url = tratarVazio(imagem_perfil_url);
-
-      if (grau === "" || grau === null) {
-        grau = undefined;
-      } else {
-        const g = Number(grau);
-        if (isNaN(g)) {
-          return res.status(400).json({ message: "Campo 'grau' deve ser numérico." });
-        }
-        grau = g;
-      }
-
-      const alunoData = {
-        usuarioId: usuario.id,
-        nome,
-        nome_social,
-        cpf,
-        dataNascimento: new Date(dataNascimento),
-        genero: generoMap[genero],
-        num_matricula,
-        id_faixa,
-        grau,
->>>>>>> main
         telefone,
         telefone_responsavel,
         endereco,
-<<<<<<< HEAD
         genero,
         imagem_perfil_url,
 
@@ -296,52 +199,6 @@ export async function register(req, res) {
   } catch (e) {
     console.error("Erro criarUsuario:", e);
     return res.status(500).json({ message: "Erro interno" });
-=======
-        imagem_perfil_url,
-        tipo: "COMUM"
-      };
-
-      // se for menor de idade + existem responsáveis
-      if (responsaveis?.length) {
-        alunoData.responsaveis = {
-          create: responsaveis.map(r => ({
-            nome: r.nome,
-            telefone: r.telefone,
-            grau_parentesco: r.grau_parentesco,
-            email: r.email
-          }))
-        };
-      }
-
-      if (turmaIds?.length) {
-        alunoData.turma_matriculas = {
-          create: turmaIds.map(id_turma => ({ id_turma }))
-        };
-      }
-
-      alunoCriado = await prisma.aluno.create({
-        data: alunoData,
-        include: {
-          responsaveis: true,
-          turma_matriculas: { include: { turma: true } },
-          faixa: true
-        }
-      });
-
-      console.log("[DEBUG] Aluno criado!");
-    }
-
-    return res.status(201).json({
-      message: "Usuário criado com sucesso",
-      usuario,
-      aluno: alunoCriado
-    });
-
-  } catch (error) {
-    console.error("===== ERRO REGISTER =====");
-    console.error(error);
-    return res.status(500).json({ message: "Erro interno ao registrar.", erro: error.message });
->>>>>>> main
   }
 }
 

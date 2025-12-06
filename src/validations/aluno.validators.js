@@ -58,7 +58,6 @@ export const editarAlunoSchema = z.object({
   telefone: z.string().optional(),
   endereco: z.string().optional(),
   genero: z.enum(["MASCULINO", "FEMININO", "OUTRO"]).optional(),
-<<<<<<< HEAD
   imagem_perfil_url: z.string().url().optional(),
   num_matricula: z.string().optional(),
   id_faixa: z.number().optional(),
@@ -66,18 +65,6 @@ export const editarAlunoSchema = z.object({
 });
 
 // Promoção a professor
-=======
-  imagem_perfil_url: z.string().optional(),
-  num_matricula: z.string().optional(),
-  id_faixa: z.string().uuid().optional(),
-
-  grau: z.string().optional(),
-
-  turmaIds: z.array(z.string()).optional()
-});
-
-// Schema para promoção a professor
->>>>>>> main
 export const atribuirFuncaoProfessorSchema = z.object({
   alunoId: z.number()
 });
