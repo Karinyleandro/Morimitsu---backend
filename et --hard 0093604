@@ -1,0 +1,70 @@
+[33m8d2b2ab[m[33m ([m[1;36mHEAD[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{0}: rebase (start): checkout origin/main
+[33m0093604[m[33m ([m[1;31morigin/feature/kariny[m[33m, [m[1;32mfeature/kariny[m[33m)[m HEAD@{1}: reset: moving to HEAD
+[33m0093604[m[33m ([m[1;31morigin/feature/kariny[m[33m, [m[1;32mfeature/kariny[m[33m)[m HEAD@{2}: reset: moving to HEAD
+[33m0093604[m[33m ([m[1;31morigin/feature/kariny[m[33m, [m[1;32mfeature/kariny[m[33m)[m HEAD@{3}: reset: moving to HEAD
+[33m0093604[m[33m ([m[1;31morigin/feature/kariny[m[33m, [m[1;32mfeature/kariny[m[33m)[m HEAD@{4}: commit: socorro
+[33md820d32[m HEAD@{5}: checkout: moving from main to feature/kariny
+[33m8d2b2ab[m[33m ([m[1;36mHEAD[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{6}: commit: add para mudar para a feature
+[33m626f97c[m HEAD@{7}: commit: subindo migrations
+[33m97963f4[m HEAD@{8}: commit: teste
+[33m92eb0ff[m HEAD@{9}: checkout: moving from main to main
+[33m92eb0ff[m HEAD@{10}: checkout: moving from feature/kariny to main
+[33md820d32[m HEAD@{11}: commit: correções
+[33mad64ff2[m HEAD@{12}: pull --tags origin feature/kariny: Merge made by the 'ort' strategy.
+[33m05557bf[m HEAD@{13}: commit: recriando o banco de dados por conta de falha no supabase e implentando a 3 entrega
+[33mf099910[m HEAD@{14}: checkout: moving from main to feature/kariny
+[33m92eb0ff[m HEAD@{15}: commit: adicionando observações que preciso alterar para a próxima entrega
+[33m5ef40af[m HEAD@{16}: checkout: moving from feature/kariny to main
+[33mf099910[m HEAD@{17}: commit: correções no prisma
+[33m9b9863b[m HEAD@{18}: commit: resolvendo conflitos na main
+[33m5ef40af[m HEAD@{19}: merge main: Fast-forward
+[33mc0385d1[m HEAD@{20}: checkout: moving from main to feature/kariny
+[33m5ef40af[m HEAD@{21}: commit: -correções na função de auth - recuperação de senha
+[33m5368fc7[m HEAD@{22}: checkout: moving from feature/kariny to main
+[33mc0385d1[m HEAD@{23}: checkout: moving from main to feature/kariny
+[33m5368fc7[m HEAD@{24}: commit: -correções
+[33m070e3ee[m HEAD@{25}: commit (merge): -correções
+[33m52f9db2[m HEAD@{26}: checkout: moving from feature/kariny to main
+[33mc0385d1[m HEAD@{27}: commit: -correções
+[33m10333b7[m HEAD@{28}: checkout: moving from main to feature/kariny
+[33m52f9db2[m HEAD@{29}: commit: -correções
+[33ma0ee1d1[m HEAD@{30}: commit: entrega final do dia
+[33mb1987a3[m HEAD@{31}: commit: mudando configuração smtp
+[33m7056f1b[m HEAD@{32}: commit: fix: add googleapis e nodemailer for Render
+[33m21824ae[m HEAD@{33}: commit: mudando configuração smtp
+[33m6eda09c[m HEAD@{34}: commit: add campo de matricula
+[33m622a2c4[m HEAD@{35}: commit: testes 1
+[33m3559adc[m HEAD@{36}: commit: correção da função enviar código
+[33m27d4105[m HEAD@{37}: commit: teste online
+[33m10333b7[m HEAD@{38}: merge feature/kariny: Fast-forward
+[33mcc13e4c[m HEAD@{39}: checkout: moving from feature/kariny to main
+[33m10333b7[m HEAD@{40}: commit: teste online
+[33m55f636f[m HEAD@{41}: commit: Atualizando a feature com a main
+[33mcc13e4c[m HEAD@{42}: merge main: Fast-forward
+[33m151c4b5[m HEAD@{43}: checkout: moving from main to feature/kariny
+[33mcc13e4c[m HEAD@{44}: commit: verificação de login e auterações nas rotas (somente o coordenador e professor no login)
+[33m73d4032[m HEAD@{45}: pull --tags origin main: Merge made by the 'ort' strategy.
+[33m13291a3[m HEAD@{46}: commit: Alterações em registro e login
+[33m52d3eb0[m HEAD@{47}: commit: mudando porta da documentação
+[33m994f239[m HEAD@{48}: commit: correções na documentação, mudando lógica e testes
+[33m1ff2d03[m HEAD@{49}: commit: organizando documentáção - ainda falta muitas coisinhas
+[33mc23afbd[m HEAD@{50}: commit: corrigindo doc-api
+[33mdef9a89[m HEAD@{51}: pull --tags origin main: Merge made by the 'ort' strategy.
+[33m97a5642[m HEAD@{52}: commit: adicionando campo de cpf na documentação da api
+[33ma46d2d5[m HEAD@{53}: checkout: moving from feature/kariny to main
+[33m151c4b5[m HEAD@{54}: pull origin main: Fast-forward
+[33m495a9cf[m HEAD@{55}: checkout: moving from main to feature/kariny
+[33ma46d2d5[m HEAD@{56}: commit: token com apenas numeros
+[33m495a9cf[m HEAD@{57}: merge feature/kariny: Fast-forward
+[33mdbe72ad[m HEAD@{58}: checkout: moving from feature/kariny to main
+[33m495a9cf[m HEAD@{59}: commit: Entrega 1- adicionando o banco online, e funções de cadastro/login, usuario, turma
+[33m76406e3[m HEAD@{60}: commit: gerando o banco de dados e criando a migration
+[33mdbe72ad[m HEAD@{61}: checkout: moving from main to feature/kariny
+[33mdbe72ad[m HEAD@{62}: checkout: moving from feature/kariny to main
+[33mdbe72ad[m HEAD@{63}: checkout: moving from main to feature/kariny
+[33mdbe72ad[m HEAD@{64}: commit: Colocando o banco de dados no Supabase e criando as tables com o prisma
+[33m854d5f4[m HEAD@{65}: checkout: moving from main to main
+[33m854d5f4[m HEAD@{66}: checkout: moving from main to main
+[33m854d5f4[m HEAD@{67}: Branch: renamed refs/heads/main to refs/heads/main
+[33m854d5f4[m HEAD@{69}: Branch: renamed refs/heads/master to refs/heads/main
+[33m854d5f4[m HEAD@{71}: commit (initial): Estruturando as pastas no modelo MVC

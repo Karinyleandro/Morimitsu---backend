@@ -5,7 +5,7 @@ import {
   obterFaixaPorId,
   atualizarFaixa,
   deletarFaixa,
-} from "../controllers/faixa.controller.js";
+} from "../controllers/FaixaController.js";
 
 const router = Router();
 
@@ -71,9 +71,15 @@ router.get("/", listarFaixas);
  *       - in: path
  *         name: id
  *         required: true
+<<<<<<< HEAD
  *         description: ID da faixa
  *         schema:
  *           type: number
+=======
+ *         description: ID da faixa (UUID)
+ *         schema:
+ *           type: string
+>>>>>>> main
  *     responses:
  *       200:
  *         description: Faixa encontrada.
@@ -92,9 +98,15 @@ router.get("/:id", obterFaixaPorId);
  *       - in: path
  *         name: id
  *         required: true
+<<<<<<< HEAD
  *         description: ID da faixa
  *         schema:
  *           type: number
+=======
+ *         description: ID da faixa (UUID)
+ *         schema:
+ *           type: string
+>>>>>>> main
  *     requestBody:
  *       required: true
  *       content:
@@ -104,6 +116,7 @@ router.get("/:id", obterFaixaPorId);
  *             properties:
  *               nome:
  *                 type: string
+<<<<<<< HEAD
  *                 example: Faixa Azul
  *               ordem:
  *                 type: number
@@ -111,6 +124,12 @@ router.get("/:id", obterFaixaPorId);
  *               imagem_faixa_url:
  *                 type: string
  *                 example: "https://url-da-imagem.com/faixa-azul.png"
+=======
+ *               ordem:
+ *                 type: number
+ *               imagem_faixa_url:
+ *                 type: string
+>>>>>>> main
  *     responses:
  *       200:
  *         description: Faixa atualizada com sucesso.
@@ -131,9 +150,15 @@ router.put("/:id", atualizarFaixa);
  *       - in: path
  *         name: id
  *         required: true
+<<<<<<< HEAD
  *         description: ID da faixa
  *         schema:
  *           type: number
+=======
+ *         description: ID da faixa (UUID)
+ *         schema:
+ *           type: string
+>>>>>>> main
  *     responses:
  *       200:
  *         description: Faixa removida com sucesso.

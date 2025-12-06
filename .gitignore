@@ -10,7 +10,6 @@ yarn-error.log
 .env.*.local
 
 # Prisma
-/prisma/migrations/
 /prisma/dev.db
 /prisma/test.db
 /prisma/.DS_Store

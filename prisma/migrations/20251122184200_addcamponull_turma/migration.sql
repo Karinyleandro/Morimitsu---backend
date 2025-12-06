@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Turma" ALTER COLUMN "data_criacao" DROP NOT NULL,
+ALTER COLUMN "total_aulas" DROP NOT NULL,
+ALTER COLUMN "ativo" DROP NOT NULL;

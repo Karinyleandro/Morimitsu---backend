@@ -10,15 +10,15 @@ import {
 } from "../validations/aluno.validators.js";
 
 import {
-  cadastrarAluno,
-  editarAluno,
-  removerAluno,
+  criarAluno,
+  atualizarAluno,
+  deletarAluno,
   listarAlunos,
-  consultarAluno,
-  atribuirFuncaoProfessor,
-  consultarFrequenciaAluno,
-  manterHistoricoFrequencia
-} from "../controllers/aluno.js";
+  detalhesAluno,
+  promoverAluno,
+  consultarFrequencias,
+  consultarHistoricoFrequencias
+} from "../controllers/aluno_controller.js";
 
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 
@@ -42,7 +42,7 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *           example: "Renatinho"
  *         cpf:
  *           type: string
- *           example: "123.456.789-00"
+ *           example: "12345678900"
  *         dataNascimento:
  *           type: string
  *           format: date
@@ -67,7 +67,7 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *           example: "Senha@123"
  *         tipo:
  *           type: string
- *           example: "PROFESSOR"
+ *           example: "COMUM"
  *         num_matricula:
  *           type: string
  *           example: "2025-001"
@@ -111,7 +111,7 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *           example: "Renatinho"
  *         cpf:
  *           type: string
- *           example: "123.456.789-00"
+ *           example: "12345678900"
  *         dataNascimento:
  *           type: string
  *           format: date
@@ -162,6 +162,15 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *           items:
  *             type: integer
  *           example: [1,2]
+ * 
+ *     AtribuirFuncaoProfessor:
+ *       type: object
+ *       required:
+ *         - alunoId
+ *       properties:
+ *         alunoId:
+ *           type: integer
+ *           example: 5
  */
 
 /**
@@ -193,7 +202,7 @@ router.post(
   authenticate,
   authorize("COORDENADOR", "ADMIN"),
   validateBody(cadastrarAlunoSchema),
-  cadastrarAluno
+  criarAluno
 );
 
 /**
@@ -232,7 +241,7 @@ router.put(
   authenticate,
   authorize("COORDENADOR", "ADMIN"),
   validateBody(editarAlunoSchema),
-  editarAluno
+  atualizarAluno
 );
 
 /**
@@ -260,14 +269,14 @@ router.put(
  *       404:
  *         description: Aluno não encontrado
  */
-router.delete("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), removerAluno);
+router.delete("/:id", authenticate, authorize("COORDENADOR", "ADMIN"), deletarAluno);
 
 /**
  * @openapi
  * /alunos:
  *   get:
  *     summary: Listar alunos
- *     description: Listagem de alunos com filtro por nome (insensitive) e paginação.
+ *     description: Listagem de alunos com filtro por nome e paginação.
  *     tags:
  *       - Alunos
  *     security:
@@ -321,7 +330,7 @@ router.get("/", authenticate, authorize("COORDENADOR", "ADMIN", "PROFESSOR"), li
  *       404:
  *         description: Aluno não encontrado
  */
-router.get("/:id", authenticate, authorize("COORDENADOR", "ADMIN", "PROFESSOR"), consultarAluno);
+router.get("/:id", authenticate, authorize("COORDENADOR", "ADMIN", "PROFESSOR"), detalhesAluno);
 
 /**
  * @openapi
@@ -340,6 +349,12 @@ router.get("/:id", authenticate, authorize("COORDENADOR", "ADMIN", "PROFESSOR"),
  *         description: Hash do ID do aluno
  *         schema:
  *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AtribuirFuncaoProfessor'
  *     responses:
  *       200:
  *         description: Aluno promovido a professor com sucesso
@@ -348,7 +363,7 @@ router.get("/:id", authenticate, authorize("COORDENADOR", "ADMIN", "PROFESSOR"),
  *       404:
  *         description: Aluno não encontrado
  */
-router.post("/:id/promover", authenticate, authorize("COORDENADOR", "ADMIN"), atribuirFuncaoProfessor);
+router.post("/:id/promover", authenticate, authorize("COORDENADOR", "ADMIN"), promoverAluno);
 
 /**
  * @openapi
@@ -375,7 +390,7 @@ router.post("/:id/promover", authenticate, authorize("COORDENADOR", "ADMIN"), at
  *       404:
  *         description: Aluno não encontrado
  */
-router.get("/:id/frequencias", authenticate, authorize("COORDENADOR", "ADMIN", "PROFESSOR"), consultarFrequenciaAluno);
+router.get("/:id/frequencias", authenticate, authorize("COORDENADOR", "ADMIN", "PROFESSOR"), consultarFrequencias);
 
 /**
  * @openapi
@@ -406,7 +421,8 @@ router.get(
   "/:id/historico-frequencias",
   authenticate,
   authorize("COORDENADOR", "ADMIN", "PROFESSOR"),
-  manterHistoricoFrequencia
+  consultarHistoricoFrequencias
 );
 
 export default router;
+// o problema de os tipos serem COMUM E AUNOPROFESSOR

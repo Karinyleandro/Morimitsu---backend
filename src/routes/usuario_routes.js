@@ -5,6 +5,7 @@ import { validateBody } from "../middlewares/zodMiddleware.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 
 import { 
+  obterUsuarioDetalhado,
   listarUsuarios, 
   atualizarUsuario, 
   deletarUsuario, 
@@ -18,16 +19,69 @@ const upload = multer({ dest: "uploads/" }); // upload básico para futuras foto
 
 /**
  * @openapi
- * /usuarios:
+ * /usuarios/{id}:
  *   get:
- *     summary: Listar todos os usuários
+ *     summary: Obter informações detalhadas de um usuário/aluno
  *     tags:
  *       - usuários
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do usuário ou aluno
+ *     responses:
+ *       200:
+ *         description: Informações detalhadas retornadas com sucesso
+ */
+router.get("/:id", authenticate, obterUsuarioDetalhado);
+
+
+/**
+ * @openapi
+ * /usuarios:
+ *   get:
+ *     summary: Listar todos os usuários (opcionalmente filtrando por nome)
+ *     tags:
+ *       - usuários
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: nome
+ *         schema:
+ *           type: string
+ *         description: Filtra usuários cujo nome contenha o valor informado
  *     responses:
  *       200:
  *         description: Lista de usuários retornada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 sucesso:
+ *                   type: boolean
+ *                 total:
+ *                   type: integer
+ *                 dados:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       nome:
+ *                         type: string
+ *                       cargo:
+ *                         type: string
+ *                       imagem_perfil_url:
+ *                         type: string
+ *                       imagem_faixa_url:
+ *                         type: string
  */
 router.get("/", authenticate, listarUsuarios);
 

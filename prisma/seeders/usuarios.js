@@ -30,7 +30,7 @@ export async function seedUsuarios() {
     console.log("✅ Admin criado ou atualizado:", admin.email);
 
     // Criar ou atualizar Coordenador com dados detalhados
-    const hashedCoord = await bcrypt.hash('coord123', 10);
+    const hashedCoord = await bcrypt.hash('Coord123', 10);
     const coordenador = await prisma.usuario.upsert({
       where: { email: "renato@gmail.com" },
       update: {},
