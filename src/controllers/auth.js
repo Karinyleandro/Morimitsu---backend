@@ -10,6 +10,12 @@ import nodemailer from "nodemailer";
 
 const SALT_ROUNDS = 10;
 
+const generoMap = {
+  M: "MASCULINO",
+  F: "FEMININO",
+  O: "OUTRO"
+};
+
 function validarSenhaForte(senha) {
   if (typeof senha !== "string") return "Senha inválida";
   if (senha.length < 8) return "A senha deve ter no mínimo 8 caracteres";
@@ -49,8 +55,27 @@ function generateCode(length = 5) {
   return token;
 }
 
+
+
+// Função auxiliar para calcular idade
+function calcularIdade(dataNascimento) {
+  if (!dataNascimento) return 0;
+  const birth = new Date(dataNascimento);
+  const now = new Date();
+  let idade = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
+    idade--;
+  }
+  return idade;
+}
+
+
 export async function register(req, res) {
   try {
+    console.log("===== [DEBUG] INÍCIO REGISTER =====");
+    console.log("[DEBUG] Body:", req.body);
+
     let {
       nome,
       nome_social,
@@ -60,89 +85,147 @@ export async function register(req, res) {
       endereco,
       genero,
       imagem_perfil_url,
+
+      // login
       email,
       password,
-      tipo,
+      cargo,
+
+      // campos de aluno
+      num_matricula,
+      id_faixa,
+      grau,
+      responsaveis,
+      turmaIds
     } = req.body;
 
-    if (!nome || !email || !password || !tipo) {
-      return res.status(400).json({
-        message: "Campos obrigatórios: nome, email, tipo e password",
-      });
+    // -------- 1. Validar campos básicos do usuário --------
+    if (!nome || !cpf || !dataNascimento || !genero || !email || !password || !cargo) {
+      return res.status(400).json({ message: "Campos obrigatórios ausentes." });
     }
 
-    tipo = tipo.trim().toUpperCase();
-    if (!["ADMIN", "PROFESSOR", "COORDENADOR"].includes(tipo)) {
-      return res.status(400).json({ message: "Tipo inválido" });
+    if (!validarCPF(cpf)) {
+      return res.status(400).json({ message: "CPF inválido." });
     }
 
-    const senhaValida = validarSenhaForte(password);
-    if (senhaValida !== true) return res.status(400).json({ message: senhaValida });
-
-    const totalCoordenadores = await prisma.usuario.count({ where: { tipo: "COORDENADOR" } });
-
-    if (totalCoordenadores > 0) {
-      const authHeader = req.headers.authorization;
-      if (!authHeader) return res.status(403).json({ message: "Acesso negado" });
-
-      const token = authHeader.split(" ")[1];
-      let decoded;
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET);
-      } catch {
-        return res.status(401).json({ message: "Token inválido" });
-      }
-
-      if (decoded.tipo !== "COORDENADOR") {
-        return res.status(403).json({ message: "Acesso negado" });
-      }
-    } else {
-      if (tipo !== "COORDENADOR") {
-        return res.status(400).json({ message: "O primeiro usuário deve ser COORDENADOR" });
-      }
+    if (!generoMap[genero]) {
+      return res.status(400).json({ message: "Gênero inválido." });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email))
-      return res.status(400).json({ message: "Formato de e-mail inválido" });
+    // -------- 2. Verificar duplicidade de CPF --------
+    const existe = await prisma.usuario.findFirst({ where: { cpf } });
+    if (existe) {
+      return res.status(409).json({ message: "CPF já cadastrado." });
+    }
 
-    const existingWhere = [{ email }];
-    if (cpf) existingWhere.push({ cpf });
+    // -------- 3. Criar usuário --------
+    console.log("[DEBUG] Criando usuário...");
 
-    const existente = await prisma.usuario.findFirst({
-      where: { OR: existingWhere },
-    });
-
-    if (existente)
-      return res.status(409).json({ message: "Já existe um usuário com esse email/CPF" });
-
-    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-
-    const user = await prisma.usuario.create({
+    const usuario = await prisma.usuario.create({
       data: {
         nome,
         nome_social,
         cpf,
-        dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
+        dataNascimento: new Date(dataNascimento),
+        genero: generoMap[genero],
         telefone,
         endereco,
-        genero,
         imagem_perfil_url,
         email,
-        passwordHash,
-        tipo,
-      },
+        password,   // assumindo que já está hash
+        cargo
+      }
     });
+
+    console.log("[DEBUG] Usuário criado:", usuario.id);
+
+    // ----------------------------------------------------------------------
+    //      SE CARGO FOR "ALUNO", CRIA O ALUNO AUTOMATICAMENTE
+    // ----------------------------------------------------------------------
+    let alunoCriado = null;
+
+    if (cargo === "ALUNO") {
+      console.log("[DEBUG] Criando aluno...");
+
+      // normalizações
+      num_matricula = tratarVazio(num_matricula);
+      id_faixa = tratarVazio(id_faixa);
+      imagem_perfil_url = tratarVazio(imagem_perfil_url);
+
+      if (grau === "" || grau === null) {
+        grau = undefined;
+      } else {
+        const g = Number(grau);
+        if (isNaN(g)) {
+          return res.status(400).json({ message: "Campo 'grau' deve ser numérico." });
+        }
+        grau = g;
+      }
+
+      const alunoData = {
+        usuarioId: usuario.id,
+        nome,
+        nome_social,
+        cpf,
+        dataNascimento: new Date(dataNascimento),
+        genero: generoMap[genero],
+        num_matricula,
+        id_faixa,
+        grau,
+        telefone,
+        endereco,
+        imagem_perfil_url,
+        tipo: "COMUM"
+      };
+
+      // se for menor de idade + existem responsáveis
+      if (responsaveis?.length) {
+        alunoData.responsaveis = {
+          create: responsaveis.map(r => ({
+            nome: r.nome,
+            telefone: r.telefone,
+            grau_parentesco: r.grau_parentesco,
+            email: r.email
+          }))
+        };
+      }
+
+      if (turmaIds?.length) {
+        alunoData.turma_matriculas = {
+          create: turmaIds.map(id_turma => ({ id_turma }))
+        };
+      }
+
+      alunoCriado = await prisma.aluno.create({
+        data: alunoData,
+        include: {
+          responsaveis: true,
+          turma_matriculas: { include: { turma: true } },
+          faixa: true
+        }
+      });
+
+      console.log("[DEBUG] Aluno criado!");
+    }
 
     return res.status(201).json({
       message: "Usuário criado com sucesso",
-      usuario: user, 
+      usuario,
+      aluno: alunoCriado
     });
-  } catch (e) {
-    console.error("Erro no registro:", e);
-    return res.status(500).json({ message: "Erro interno" });
+
+  } catch (error) {
+    console.error("===== ERRO REGISTER =====");
+    console.error(error);
+    return res.status(500).json({ message: "Erro interno ao registrar.", erro: error.message });
   }
 }
+
+function tratarVazio(v) {
+  if (typeof v === "string" && v.trim() === "") return undefined;
+  return v;
+}
+
 
 export async function login(req, res) {
   try {

@@ -27,102 +27,52 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  * @openapi
  * /auth/register:
  *   post:
- *     summary: Registrar um novo usuário do sistema
+ *     summary: Registrar um novo usuário (com ou sem vínculo de aluno)
  *     description: |
- *       Apenas **COORDENADORES** podem criar novos usuários que têm acesso ao sistema.
+ *       Apenas **COORDENADORES** podem registrar novos usuários no sistema.
  *
- *       Tipos permitidos:
+ *       Tipos permitidos para o usuário:
  *       - **ADMIN**
- *       - **PROFESSOR**
  *       - **COORDENADOR**
+ *       - **PROFESSOR**
+ *       - **ALUNO**
  *
- *       ⚠ **Alunos não são criados aqui** → use `/alunos`.
+ *       Regras de criação:
+ *       - **ADMIN** e **COORDENADOR** → não criam aluno
+ *       - **ALUNO** → sempre cria aluno do tipo **COMUM**
+ *       - **PROFESSOR**:
+ *         - Se enviar dados de aluno → cria aluno do tipo **ALUNO_PROFESSOR**
+ *         - Se não enviar → cria só o usuário professor
  *
  *     tags:
  *       - auth
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - nome
- *               - email
- *               - password
- *               - tipo
- *               - genero
- *             properties:
- *               nome:
- *                 type: string
- *                 example: "Renato José de Souza"
- *               nome_social:
- *                 type: string
- *                 nullable: true
- *                 example: "Renatinho"
- *               cpf:
- *                 type: string
- *                 example: "123.456.789-00"
- *               dataNascimento:
- *                 type: string
- *                 format: date
- *                 example: "2008-12-07"
- *               telefone:
- *                 type: string
- *                 example: "(88) 99583-8843"
- *               endereco:
- *                 type: string
- *                 example: "Rua Obi Juci Diniz, 153 - Prado"
- *               genero:
- *                 type: string
- *                 enum: [MASCULINO, FEMININO, OUTRO]
- *                 example: "MASCULINO"
- *               imagem_perfil_url:
- *                 type: string
- *                 nullable: true
- *                 example: "https://cdn.site.com/fotos/renato.png"
- *               email:
- *                 type: string
- *                 example: "renato@gmail.com"
- *               password:
- *                 type: string
- *                 example: "Senha@123"
- *               tipo:
- *                 type: string
- *                 enum: [ADMIN, PROFESSOR, COORDENADOR]
- *                 example: "PROFESSOR"
+ *             $ref: '#/components/schemas/RegisterUser'
+ *
  *     responses:
  *       201:
- *         description: Usuário criado com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Usuário criado com sucesso
- *                 usuario:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       example: "aj82hsg7127sgsj2"
- *                     nome:
- *                       type: string
- *                       example: "Renato José de Souza"
- *                     email:
- *                       type: string
- *                       example: "renato@gmail.com"
- *                     tipo:
- *                       type: string
- *                       example: "PROFESSOR"
+ *         description: Usuário criado com sucesso (com ou sem aluno)
  *       403:
  *         description: Apenas coordenadores podem criar usuários
  *       409:
- *         description: Já existe um usuário com esse email ou CPF
+ *         description: Email ou CPF já cadastrado
+ */
+
+/**
+ * Rota de registro de usuário
+ *
+ * Middlewares:
+ * - authenticate → exige token JWT válido
+ * - authorize("COORDENADOR") → só COORDENADOR pode criar usuários
+ * - validateBody(registerSchema) → valida o JSON do body
+ * - register → controller que faz toda a lógica
  */
 router.post(
   "/register",
@@ -131,6 +81,7 @@ router.post(
   validateBody(registerSchema),
   register
 );
+
 
 /**
  * @openapi
@@ -143,7 +94,7 @@ router.post(
  *       - **PROFESSOR**
  *       - **COORDENADOR**
  *
- *       🚫 Alunos não podem fazer login.
+ *       Alunos não podem fazer login.
  *
  *       O usuário pode entrar usando:
  *       - Email  

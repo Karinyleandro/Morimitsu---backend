@@ -1,4 +1,4 @@
-import { prisma } from "../database/database.js";
+import prisma from "../prisma.js";
 
 // Middleware simples para verificar roles
 function requireRole(user, roles) {
@@ -59,10 +59,15 @@ export const listarFaixas = async (req, res) => {
 
 export const obterFaixaPorId = async (req, res) => {
   try {
+    console.log("PARAMS RECEBIDOS:", req.params); // <-- DEBUG
     const { id } = req.params;
 
+    if (!id) {
+      return res.status(400).json({ error: "ID não recebido na rota." });
+    }
+
     const faixa = await prisma.faixa.findUnique({
-      where: { id: Number(id) },
+      where: { id },
       include: {
         requisitos: true,
         graduacoes: true,
@@ -70,16 +75,18 @@ export const obterFaixaPorId = async (req, res) => {
       },
     });
 
-    if (!faixa)
-      return res.status(404).json({ message: "Faixa não encontrada." });
+    if (!faixa) {
+      return res.status(404).json({ error: "Faixa não encontrada." });
+    }
 
-    return res.json(faixa);
+    res.json(faixa);
 
-  } catch (err) {
-    console.error("Erro ao buscar faixa:", err);
-    return res.status(500).json({ message: "Erro interno do servidor." });
+  } catch (error) {
+    console.error("Erro ao buscar faixa:", error);
+    res.status(500).json({ error: "Erro ao buscar faixa." });
   }
 };
+
 
 export const atualizarFaixa = async (req, res) => {
   try {

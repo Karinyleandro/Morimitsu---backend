@@ -122,17 +122,18 @@ export const criarTurma = async (req, res) => {
 
     // Se não existir, cria automaticamente
     if (!resp) {
+      const senhaTemporaria = await bcrypt.hash('senhaTemporaria123', SALT_ROUNDS);
       resp = await prisma.usuario.create({
         data: {
           nome: responsavelNome,
           tipo: 'COORDENADOR', // ou 'PROFESSOR' se quiser
           ativo: true,
-          senha: 'senhaTemporaria123' // obrigatório para Prisma, pode hash
+          passwordHash: senhaTemporaria
         }
       });
     }
 
-    // Cria a turma (campos opcionais podem ficar nulos)
+    // Cria a turma
     const turma = await prisma.turma.create({
       data: {
         nome_turma: nome,
@@ -140,14 +141,13 @@ export const criarTurma = async (req, res) => {
         faixa_etaria_max: Number(faixaEtariaMax),
         data_criacao: new Date(),
         imagem_turma_url: fotoTurmaUrl ?? null,
-        total_aulas: null, // agora opcional
+        total_aulas: null,
         id_coordenador: req.user.tipo === 'COORDENADOR' ? req.user.id : null,
-        id_professor: null,
         ativo: true
       }
     });
 
-    // Associa o responsável à turma
+    // Associa o responsável à turma (UUID correto)
     await prisma.turmaResponsavel.create({
       data: { turmaId: turma.id, usuarioId: resp.id }
     });
