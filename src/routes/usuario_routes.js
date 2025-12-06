@@ -9,7 +9,7 @@ import {
   atualizarUsuario, 
   deletarUsuario, 
   atualizarFotoUsuario 
-} from "../controllers/usuario.js";
+} from "../controllers/UsuarioController.js";
 
 import { atualizarUsuarioSchema } from "../validations/usuario.validators.js";
 

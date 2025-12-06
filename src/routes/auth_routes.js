@@ -29,19 +29,23 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *   post:
  *     summary: Registrar um novo usuário do sistema
  *     description: |
- *       Apenas **COORDENADORES** podem criar novos usuários que têm acesso ao sistema.
+ *       Apenas **COORDENADORES** podem criar usuários no sistema.
  *
  *       Tipos permitidos:
- *       - **ADMIN**
- *       - **PROFESSOR**
- *       - **COORDENADOR**
+ *       - ADMIN
+ *       - PROFESSOR
+ *       - COORDENADOR
+ *       - ALUNO
+ *       - ALUNO_PROFESSOR
  *
- *       ⚠ **Alunos não são criados aqui** → use `/alunos`.
+ *       O payload abaixo contém **todos os campos possíveis**.  
+ *       O backend valida quais são obrigatórios de acordo com o tipo selecionado.
  *
  *     tags:
  *       - auth
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -64,17 +68,25 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *                 example: "Renatinho"
  *               cpf:
  *                 type: string
+ *                 nullable: true
  *                 example: "123.456.789-00"
  *               dataNascimento:
  *                 type: string
  *                 format: date
+ *                 nullable: true
  *                 example: "2008-12-07"
  *               telefone:
  *                 type: string
- *                 example: "(88) 99583-8843"
+ *                 nullable: true
+ *                 example: "(88)99583-8843"
+ *               telefone_responsavel:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "(88)99583-8843"
  *               endereco:
  *                 type: string
- *                 example: "Rua Obi Juci Diniz, 153 - Prado"
+ *                 nullable: true
+ *                 example: "Rua Obi Juca Diniz, 153 - Prado"
  *               genero:
  *                 type: string
  *                 enum: [MASCULINO, FEMININO, OUTRO]
@@ -91,8 +103,30 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *                 example: "Senha@123"
  *               tipo:
  *                 type: string
- *                 enum: [ADMIN, PROFESSOR, COORDENADOR]
- *                 example: "PROFESSOR"
+ *                 enum: [ADMIN, PROFESSOR, COORDENADOR, ALUNO, ALUNO_PROFESSOR]
+ *                 example: "ALUNO"
+ *
+ *               faixa:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Branca"
+ *               grau:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "1º"
+ *               matricula:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "202590219278"
+ *               aulas:
+ *                 type: number
+ *                 nullable: true
+ *                 example: 30
+ *               turma:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Mista"
+ *
  *     responses:
  *       201:
  *         description: Usuário criado com sucesso
@@ -118,7 +152,7 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *                       example: "renato@gmail.com"
  *                     tipo:
  *                       type: string
- *                       example: "PROFESSOR"
+ *                       example: "ALUNO"
  *       403:
  *         description: Apenas coordenadores podem criar usuários
  *       409:
@@ -131,6 +165,8 @@ router.post(
   validateBody(registerSchema),
   register
 );
+
+
 
 /**
  * @openapi

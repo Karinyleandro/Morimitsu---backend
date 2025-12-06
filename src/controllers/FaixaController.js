@@ -1,8 +1,8 @@
-import { prisma } from "../database/database.js";
+import prisma from "../database/database.js";
 
-// Middleware simples para verificar roles
+// Checagem de role
 function requireRole(user, roles) {
-  if (!roles.includes(user.role)) {
+  if (!roles.includes(user.tipo)) {
     throw { status: 403, message: "Acesso negado." };
   }
 }
@@ -31,10 +31,11 @@ export const criarFaixa = async (req, res) => {
     });
 
     return res.status(201).json(faixa);
-
   } catch (err) {
     console.error("Erro ao criar faixa:", err);
-    return res.status(err.status || 500).json({ message: err.message || "Erro interno do servidor." });
+    return res.status(err.status || 500).json({
+      message: err.message || "Erro interno do servidor.",
+    });
   }
 };
 
@@ -45,12 +46,11 @@ export const listarFaixas = async (req, res) => {
       include: {
         requisitos: true,
         graduacoes: true,
-        alunos: true,
+        alunos: true, // correto com seu schema
       },
     });
 
     return res.json(faixas);
-
   } catch (err) {
     console.error("Erro ao listar faixas:", err);
     return res.status(500).json({ message: "Erro interno do servidor." });
@@ -62,7 +62,7 @@ export const obterFaixaPorId = async (req, res) => {
     const { id } = req.params;
 
     const faixa = await prisma.faixa.findUnique({
-      where: { id: Number(id) },
+      where: { id },
       include: {
         requisitos: true,
         graduacoes: true,
@@ -74,10 +74,11 @@ export const obterFaixaPorId = async (req, res) => {
       return res.status(404).json({ message: "Faixa não encontrada." });
 
     return res.json(faixa);
-
   } catch (err) {
     console.error("Erro ao buscar faixa:", err);
-    return res.status(500).json({ message: "Erro interno do servidor." });
+    return res.status(500).json({
+      message: "Erro interno do servidor.",
+    });
   }
 };
 
@@ -89,7 +90,7 @@ export const atualizarFaixa = async (req, res) => {
     const { nome, ordem, imagem_faixa_url } = req.body;
 
     const faixa = await prisma.faixa.findUnique({
-      where: { id: Number(id) },
+      where: { id },
     });
 
     if (!faixa)
@@ -104,23 +105,26 @@ export const atualizarFaixa = async (req, res) => {
       });
 
       if (existeOrdem)
-        return res.status(400).json({ message: "Já existe outra faixa com essa ordem." });
+        return res.status(400).json({
+          message: "Já existe outra faixa com essa ordem.",
+        });
     }
 
     const faixaAtualizada = await prisma.faixa.update({
-      where: { id: Number(id) },
+      where: { id },
       data: {
         ...(nome && { nome }),
         ...(ordem !== undefined && { ordem: Number(ordem) }),
         ...(imagem_faixa_url && { imagem_faixa_url }),
-      }
+      },
     });
 
     return res.json(faixaAtualizada);
-
   } catch (err) {
     console.error("Erro ao atualizar faixa:", err);
-    return res.status(err.status || 500).json({ message: err.message || "Erro interno do servidor." });
+    return res.status(err.status || 500).json({
+      message: err.message || "Erro interno do servidor.",
+    });
   }
 };
 
@@ -131,15 +135,15 @@ export const deletarFaixa = async (req, res) => {
     const { id } = req.params;
 
     const faixa = await prisma.faixa.findUnique({
-      where: { id: Number(id) },
+      where: { id },
     });
 
     if (!faixa)
       return res.status(404).json({ message: "Faixa não encontrada." });
 
-    // Verificar alunos
-    const alunos = await prisma.aluno.findMany({
-      where: { faixaId: Number(id) },
+    // Verifica alunos vinculados
+    const alunos = await prisma.usuario.findMany({
+      where: { id_faixa: id },
     });
 
     if (alunos.length > 0)
@@ -147,28 +151,31 @@ export const deletarFaixa = async (req, res) => {
         message: "Não é possível excluir uma faixa com alunos vinculados.",
       });
 
-    // Verificar requisitos e graduações
-    const requisitos = await prisma.requisito.findMany({
-      where: { faixaId: Number(id) },
+    // Verifica requisitos
+    const requisitos = await prisma.requisito_Grau.findMany({
+      where: { faixa_id: id },
     });
 
+    // Verifica graduações
     const graduacoes = await prisma.graduacao.findMany({
-      where: { faixaId: Number(id) },
+      where: { faixa_id: id },
     });
 
     if (requisitos.length > 0 || graduacoes.length > 0)
       return res.status(400).json({
-        message: "Exclua requisitos e graduações antes de remover a faixa.",
+        message:
+          "Exclua requisitos e graduações antes de remover a faixa.",
       });
 
     await prisma.faixa.delete({
-      where: { id: Number(id) },
+      where: { id },
     });
 
     return res.json({ message: "Faixa removida com sucesso." });
-
   } catch (err) {
     console.error("Erro ao deletar faixa:", err);
-    return res.status(err.status || 500).json({ message: err.message || "Erro interno do servidor." });
+    return res.status(err.status || 500).json({
+      message: err.message || "Erro interno do servidor.",
+    });
   }
 };

@@ -49,73 +49,96 @@ function generateCode(length = 5) {
 
 export async function register(req, res) {
   try {
-    let {
+    const {
       nome,
       nome_social,
       cpf,
       dataNascimento,
       telefone,
+      telefone_responsavel,
       endereco,
       genero,
       imagem_perfil_url,
       email,
       password,
       tipo,
+      faixa,
+      grau,
+      matricula,
+      aulas,
+      turma // <- AGORA RECEBE O NOME
     } = req.body;
 
+    // ----------------------------
+    // 1. CAMPOS OBRIGATÓRIOS
+    // ----------------------------
     if (!nome || !email || !password || !tipo) {
       return res.status(400).json({
         message: "Campos obrigatórios: nome, email, tipo e password",
       });
     }
 
-    tipo = tipo.trim().toUpperCase();
-    if (!["ADMIN", "PROFESSOR", "COORDENADOR"].includes(tipo)) {
-      return res.status(400).json({ message: "Tipo inválido" });
+    const cargo = tipo.toUpperCase().trim();
+
+    const cargosValidos = [
+      "ADMIN",
+      "PROFESSOR",
+      "COORDENADOR",
+      "ALUNO",
+      "ALUNO_PROFESSOR"
+    ];
+
+    if (!cargosValidos.includes(cargo)) {
+      return res.status(400).json({ message: "Cargo inválido" });
     }
 
+    // ----------------------------
+    // 2. VALIDAR SENHA
+    // ----------------------------
     const senhaValida = validarSenhaForte(password);
-    if (senhaValida !== true) return res.status(400).json({ message: senhaValida });
+    if (senhaValida !== true)
+      return res.status(400).json({ message: senhaValida });
 
-    const totalCoordenadores = await prisma.usuario.count({ where: { tipo: "COORDENADOR" } });
-
-    if (totalCoordenadores > 0) {
-      const authHeader = req.headers.authorization;
-      if (!authHeader) return res.status(403).json({ message: "Acesso negado" });
-
-      const token = authHeader.split(" ")[1];
-      let decoded;
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET);
-      } catch {
-        return res.status(401).json({ message: "Token inválido" });
-      }
-
-      if (decoded.tipo !== "COORDENADOR") {
-        return res.status(403).json({ message: "Acesso negado" });
-      }
-    } else {
-      if (tipo !== "COORDENADOR") {
-        return res.status(400).json({ message: "O primeiro usuário deve ser COORDENADOR" });
-      }
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email))
-      return res.status(400).json({ message: "Formato de e-mail inválido" });
-
-    const existingWhere = [{ email }];
-    if (cpf) existingWhere.push({ cpf });
-
+    // ----------------------------
+    // 3. VERIFICAR EMAIL/CPF ÚNICOS
+    // ----------------------------
     const existente = await prisma.usuario.findFirst({
-      where: { OR: existingWhere },
+      where: { OR: [{ email }, { cpf }] }
     });
 
-    if (existente)
-      return res.status(409).json({ message: "Já existe um usuário com esse email/CPF" });
+    if (existente) {
+      return res.status(409).json({
+        message: "Já existe um usuário com esse email/CPF",
+      });
+    }
 
-    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    // ----------------------------
+    // 4. BUSCAR TURMA PELO NOME
+    // ----------------------------
+    let turmaEncontrada = null;
 
+    if (turma) {
+      turmaEncontrada = await prisma.turma.findFirst({
+        where: {
+          nome: turma.trim()
+        }
+      });
+
+      if (!turmaEncontrada) {
+        return res.status(400).json({
+          message: `A turma '${turma}' não existe`
+        });
+      }
+    }
+
+    // ----------------------------
+    // 5. HASH SENHA
+    // ----------------------------
+    const hash = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // ----------------------------
+    // 6. CRIAR USUÁRIO
+    // ----------------------------
     const user = await prisma.usuario.create({
       data: {
         nome,
@@ -123,21 +146,31 @@ export async function register(req, res) {
         cpf,
         dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
         telefone,
+        telefone_responsavel,
         endereco,
         genero,
         imagem_perfil_url,
+
         email,
-        passwordHash,
-        tipo,
+        passwordHash: hash,
+        tipo: cargo,
+
+        faixa,
+        grau,
+        matricula,
+        aulas,
+
+        turmaId: turmaEncontrada ? turmaEncontrada.id : null
       },
     });
 
     return res.status(201).json({
-      message: "Usuário criado com sucesso",
-      usuario: user, 
+      message: `Usuário (${cargo}) criado com sucesso`,
+      usuario: user,
     });
+
   } catch (e) {
-    console.error("Erro no registro:", e);
+    console.error("Erro criarUsuario:", e);
     return res.status(500).json({ message: "Erro interno" });
   }
 }
