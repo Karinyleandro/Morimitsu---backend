@@ -17,7 +17,6 @@ const router = express.Router();
  *         name: q
  *         schema:
  *           type: string
- *         description: Busca por nome da turma
  *       - in: query
  *         name: faixaEtariaMin
  *         schema:
@@ -29,7 +28,8 @@ const router = express.Router();
  *       - in: query
  *         name: responsavelId
  *         schema:
- *           type: integer
+ *           type: string
+ *           format: uuid
  *       - in: query
  *         name: page
  *         schema:
@@ -76,14 +76,15 @@ router.get("/usuarios/filtro", authenticate, TurmaCtrl.usuariosParaFiltro);
  *             type: object
  *             required:
  *               - nome
- *               - responsavelNome
+ *               - responsavelId
  *               - faixaEtariaMin
  *               - faixaEtariaMax
  *             properties:
  *               nome:
  *                 type: string
- *               responsavelNome:
+ *               responsavelId:
  *                 type: string
+ *                 format: uuid
  *               faixaEtariaMin:
  *                 type: integer
  *               faixaEtariaMax:
@@ -93,10 +94,6 @@ router.get("/usuarios/filtro", authenticate, TurmaCtrl.usuariosParaFiltro);
  *     responses:
  *       201:
  *         description: Turma criada com sucesso
- *       400:
- *         description: Campos obrigatórios faltando
- *       403:
- *         description: Sem permissão
  */
 router.post(
   "/",
@@ -119,6 +116,7 @@ router.post(
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     requestBody:
  *       content:
  *         application/json:
@@ -131,12 +129,11 @@ router.post(
  *                 type: integer
  *               faixaEtariaMax:
  *                 type: integer
- *               fotoTurma:
+ *               fotoTurmaUrl:
  *                 type: string
- *               responsaveisIds:
- *                 type: array
- *                 items:
- *                   type: integer
+ *               responsavelId:
+ *                 type: string
+ *                 format: uuid
  *     responses:
  *       200:
  *         description: Turma atualizada com sucesso
@@ -162,6 +159,7 @@ router.put(
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     responses:
  *       200:
  *         description: Turma removida com sucesso
@@ -184,9 +182,10 @@ router.delete(
  *     parameters:
  *       - in: path
  *         name: id
- *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *         required: true
  *     requestBody:
  *       required: true
  *       content:
@@ -197,7 +196,8 @@ router.delete(
  *               - alunoId
  *             properties:
  *               alunoId:
- *                 type: integer
+ *                 type: string
+ *                 format: uuid
  *     responses:
  *       200:
  *         description: Aluno adicionado à turma
@@ -220,10 +220,14 @@ router.post(
  *     parameters:
  *       - name: id
  *         in: path
- *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
  *       - name: alunoId
  *         in: path
- *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     responses:
  *       200:
  *         description: Aluno removido da turma
@@ -239,7 +243,10 @@ router.delete(
  * @openapi
  * /turmas/{id}/frequencia:
  *   post:
- *     summary: Registra frequência de uma aula
+ *     summary: Registra a frequência de uma aula para uma turma
+ *     description: >
+ *       Registra presenças e ausências dos alunos em uma data específica para a turma informada.
+ *       O campo **id** no path deve ser o **UUID da turma**.
  *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
@@ -247,8 +254,10 @@ router.delete(
  *       - name: id
  *         in: path
  *         required: true
+ *         description: UUID da turma na qual a frequência será registrada.
  *         schema:
  *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -261,8 +270,12 @@ router.delete(
  *             properties:
  *               data:
  *                 type: string
+ *                 format: date
+ *                 example: "2025-02-20"
+ *                 description: Data da aula.
  *               frequencias:
  *                 type: array
+ *                 description: Lista de alunos com seu status de presença.
  *                 items:
  *                   type: object
  *                   required:
@@ -270,37 +283,49 @@ router.delete(
  *                     - presente
  *                   properties:
  *                     alunoId:
- *                       type: integer
+ *                       type: string
+ *                       format: uuid
+ *                       example: "4cbb1e73-d8f4-4d8f-9c4a-14cc74af39b6"
  *                     presente:
  *                       type: boolean
+ *                       example: true
  *     responses:
  *       201:
- *         description: Frequência registrada com sucesso
+ *         description: Frequência registrada com sucesso.
+ *       400:
+ *         description: Payload inválido.
+ *       403:
+ *         description: Sem permissão ou não autorizado para a turma.
+ *       404:
+ *         description: Turma não encontrada.
  */
 router.post(
   "/:id/frequencia",
   authenticate,
-  authorize("ADMIN", "COORDENADOR", "PROFESSOR"),
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
   TurmaCtrl.registrarFrequencia
 );
+
 
 /**
  * @openapi
  * /turmas/frequencias:
  *   get:
- *     summary: Lista frequência por aluno ou turma
+ *     summary: Consulta registros de frequência de uma turma
+ *     description: >
+ *       Retorna os registros de frequência associados à turma informada.  
+ *       Apenas **turmaId** é utilizado na implementação atual.
  *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: turmaId
+ *         required: true
+ *         description: UUID da turma a ser consultada.
  *         schema:
  *           type: string
- *       - in: query
- *         name: alunoId
- *         schema:
- *           type: integer
+ *           format: uuid
  *       - in: query
  *         name: page
  *         schema:
@@ -313,12 +338,18 @@ router.post(
  *           default: 50
  *     responses:
  *       200:
- *         description: Frequências encontradas
+ *         description: Registros de frequência encontrados.
+ *       400:
+ *         description: turmaId não informado.
+ *       403:
+ *         description: Sem permissão para acessar os dados da turma.
+ *       404:
+ *         description: Turma não encontrada.
  */
 router.get(
   "/frequencias",
   authenticate,
-  authorize("ADMIN", "COORDENADOR", "PROFESSOR"),
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
   TurmaCtrl.consultarFrequencias
 );
 

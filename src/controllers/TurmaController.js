@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { padraoRespostaErro } from '../validations/turma.validators.js';
+import { v4 as uuid } from "uuid";
+
 
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
@@ -88,11 +90,10 @@ export const listarTurmas = async (req, res) => {
   }
 };
 
-
 export const usuariosParaFiltro = async (req, res) => {
   try {
     const usuarios = await prisma.usuario.findMany({
-      where: { tipo: { in: ['PROFESSOR', 'COORDENADOR'] }, ativo: true },
+      where: { tipo: { in: ['PROFESSOR', 'COORDENADOR', "ALUNO_PROFESSOR"] }, ativo: true },
       select: { id: true, nome: true, tipo: true, imagem_perfil_url: true },
       orderBy: { nome: 'asc' }
     });
@@ -107,31 +108,33 @@ export const usuariosParaFiltro = async (req, res) => {
 export const criarTurma = async (req, res) => {
   try {
     // Verifica permissão
-    if (!['COORDENADOR', 'ADMIN'].includes(req.user.tipo))
-      return padraoRespostaErro(res, 'Sem permissão', 403);
+    if (!["COORDENADOR", "ADMIN"].includes(req.user.tipo))
+      return padraoRespostaErro(res, "Sem permissão", 403);
 
     // Extrai dados do body
-    const { nome, responsavelNome, faixaEtariaMin, faixaEtariaMax, fotoTurmaUrl } = req.body;
+    const {
+      nome,
+      responsavelId,
+      faixaEtariaMin,
+      faixaEtariaMax,
+      fotoTurmaUrl
+    } = req.body;
 
     // Valida campos obrigatórios
-    if (!nome || !responsavelNome || faixaEtariaMin == null || faixaEtariaMax == null)
-      return padraoRespostaErro(res, 'Campos obrigatórios faltando', 400);
+    if (!nome || !responsavelId || faixaEtariaMin == null || faixaEtariaMax == null)
+      return padraoRespostaErro(res, "Campos obrigatórios faltando", 400);
 
-    // Busca usuário responsável pelo nome
-    let resp = await prisma.usuario.findFirst({ where: { nome: responsavelNome } });
+    // Verifica se o responsável existe
+    const resp = await prisma.usuario.findUnique({
+      where: { id: responsavelId }
+    });
 
-    // Se não existir, cria automaticamente
-    if (!resp) {
-      const senhaTemporaria = await bcrypt.hash('senhaTemporaria123', SALT_ROUNDS);
-      resp = await prisma.usuario.create({
-        data: {
-          nome: responsavelNome,
-          tipo: 'COORDENADOR', // ou 'PROFESSOR' se quiser
-          ativo: true,
-          passwordHash: senhaTemporaria
-        }
-      });
-    }
+    if (!resp)
+      return padraoRespostaErro(res, "Responsável não encontrado", 404);
+
+    // Verifica se o tipo do responsável é válido
+    if (!["PROFESSOR", "COORDENADOR"].includes(resp.tipo))
+      return padraoRespostaErro(res, "Responsável deve ser PROFESSOR ou COORDENADOR", 400);
 
     // Cria a turma
     const turma = await prisma.turma.create({
@@ -142,26 +145,30 @@ export const criarTurma = async (req, res) => {
         data_criacao: new Date(),
         imagem_turma_url: fotoTurmaUrl ?? null,
         total_aulas: null,
-        id_coordenador: req.user.tipo === 'COORDENADOR' ? req.user.id : null,
+        id_coordenador: req.user.tipo === "COORDENADOR" ? req.user.id : null,
         ativo: true
       }
     });
 
-    // Associa o responsável à turma (UUID correto)
+    // Associa o responsável à turma
     await prisma.turmaResponsavel.create({
-      data: { turmaId: turma.id, usuarioId: resp.id }
+      data: {
+        turmaId: turma.id,
+        usuarioId: resp.id
+      }
     });
 
     return res.status(201).json({
-      mensagem: 'Turma criada com sucesso',
-      turma: { ...turma, id: await hashId(turma.id) }
+      mensagem: "Turma criada com sucesso",
+      turma
     });
 
   } catch (err) {
-    console.error('Erro criarTurma:', err);
-    return padraoRespostaErro(res, 'Erro ao criar turma', 500);
+    console.error("Erro criarTurma:", err);
+    return padraoRespostaErro(res, "Erro ao criar turma", 500);
   }
 };
+
 
 export const editarTurma = async (req, res) => {
   try {
@@ -295,27 +302,46 @@ export const desenturmarAluno = async (req, res) => {
 
 export const registrarFrequencia = async (req, res) => {
   try {
-    if (!['COORDENADOR', 'PROFESSOR', 'ADMIN'].includes(req.user.tipo))
-      return padraoRespostaErro(res, 'Sem permissão', 403);
+    const usuarioLogado = req.user;
 
-    const { id: hashTurma } = req.params;
+    // Permissão
+    if (!['PROFESSOR', 'COORDENADOR', 'ALUNO_PROFESSOR', 'ADMIN'].includes(usuarioLogado.tipo)) {
+      return padraoRespostaErro(res, 'Sem permissão', 403);
+    }
+
+    // Agora é UUID real
+    const { id: turmaId } = req.params;
     const { data, frequencias } = req.body;
 
-    if (!data || !Array.isArray(frequencias))
+    if (!turmaId || !data || !Array.isArray(frequencias)) {
       return padraoRespostaErro(res, 'Payload inválido', 400);
+    }
 
-    const turma = await encontrarTurmaPorHash(hashTurma);
+    // Busca a turma diretamente por UUID
+    const turma = await prisma.turma.findUnique({
+      where: { id: turmaId }
+    });
+
     if (!turma) return padraoRespostaErro(res, 'Turma não encontrada', 404);
+
+    // Verificação de permissão
+    if (
+      ['PROFESSOR', 'ALUNO_PROFESSOR'].includes(usuarioLogado.tipo) &&
+      turma.id_professor !== usuarioLogado.id
+    ) {
+      return padraoRespostaErro(res, 'Não autorizado para registrar nesta turma', 403);
+    }
 
     const dataAula = new Date(data);
 
+    // Loop de frequências
     for (const f of frequencias) {
       if (!f.alunoId || typeof f.presente !== 'boolean') continue;
 
       const existente = await prisma.frequencia.findFirst({
         where: {
           id_turma: turma.id,
-          id_aluno: Number(f.alunoId),
+          id_aluno: f.alunoId,
           data_aula: dataAula
         }
       });
@@ -323,14 +349,17 @@ export const registrarFrequencia = async (req, res) => {
       if (existente) {
         await prisma.frequencia.update({
           where: { id: existente.id },
-          data: { presente: f.presente, id_registrador: req.user.id }
+          data: {
+            presente: f.presente,
+            id_registrador: usuarioLogado.id
+          }
         });
       } else {
         await prisma.frequencia.create({
           data: {
             id_turma: turma.id,
-            id_aluno: Number(f.alunoId),
-            id_registrador: req.user.id,
+            id_aluno: f.alunoId,
+            id_registrador: usuarioLogado.id,
             presente: f.presente,
             data_aula: dataAula
           }
@@ -338,36 +367,48 @@ export const registrarFrequencia = async (req, res) => {
       }
     }
 
-    return res.status(201).json({ mensagem: 'Frequência registrada' });
+    return res.status(201).json({ mensagem: 'Frequência registrada com sucesso' });
   } catch (err) {
     console.error('Erro registrarFrequencia:', err);
-    return padraoRespostaErro(res, 'Erro ao registrar', 500);
+    return padraoRespostaErro(res, 'Erro ao registrar frequência', 500);
   }
 };
 
 export const consultarFrequencias = async (req, res) => {
   try {
-    const { turmaId: hashTurmaId, alunoId, page = 1, limit = 50 } = req.query;
+    const { turmaId, page = 1, limit = 50 } = req.query;
+    const usuarioLogado = req.user;
 
-    const where = {};
-    if (hashTurmaId) {
-      const turma = await encontrarTurmaPorHash(hashTurmaId);
-      if (!turma) return padraoRespostaErro(res, 'Turma não encontrada', 404);
-      where.id_turma = turma.id;
+    if (!['PROFESSOR', 'COORDENADOR', 'ALUNO_PROFESSOR', 'ADMIN'].includes(usuarioLogado.tipo)) {
+      return padraoRespostaErro(res, 'Sem permissão', 403);
     }
 
-    if (alunoId) where.id_aluno = Number(alunoId);
+    if (!turmaId) return padraoRespostaErro(res, 'turmaId obrigatório', 400);
+
+    const turma = await prisma.turma.findUnique({
+      where: { id: turmaId }
+    });
+
+    if (!turma) return padraoRespostaErro(res, 'Turma não encontrada', 404);
+
+    if (
+      ['PROFESSOR', 'ALUNO_PROFESSOR'].includes(usuarioLogado.tipo) &&
+      turma.id_professor !== usuarioLogado.id
+    ) {
+      return padraoRespostaErro(res, 'Não autorizado para esta turma', 403);
+    }
 
     const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
 
     const [total, registros] = await Promise.all([
-      prisma.frequencia.count({ where }),
+      prisma.frequencia.count({ where: { id_turma: turma.id } }),
+
       prisma.frequencia.findMany({
-        where,
+        where: { id_turma: turma.id },
         include: {
-          aluno: true,
-          turma: true,
-          registrador: true
+          aluno: { select: { id: true, nome: true, num_matricula: true, aulas: true } },
+          turma: { select: { id: true, nome_turma: true, total_aulas: true } },
+          registrador: { select: { id: true, nome: true, tipo: true } }
         },
         orderBy: { data_aula: 'desc' },
         skip,
@@ -375,24 +416,13 @@ export const consultarFrequencias = async (req, res) => {
       })
     ]);
 
-    const registrosFormatados = await Promise.all(
-      registros.map(async (r) => ({
-        id: r.id,
-        data_aula: r.data_aula,
-        presente: r.presente,
-        aluno: r.aluno,
-        turma: r.turma,
-        registrador: r.registrador,
-        id_turma_hash: await hashId(r.id_turma)
-      }))
-    );
-
     return res.json({
       total,
       page: Number(page),
       limit: Number(limit),
-      registros: registrosFormatados
+      registros
     });
+
   } catch (err) {
     console.error('Erro consultarFrequencias:', err);
     return padraoRespostaErro(res, 'Erro ao consultar frequências', 500);

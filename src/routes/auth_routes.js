@@ -22,28 +22,12 @@ import {
 } from "../controllers/auth.js";
 
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
-
 /**
  * @openapi
  * /auth/register:
  *   post:
- *     summary: Registrar um novo usuário (com ou sem vínculo de aluno)
- *     description: |
- *       Apenas **COORDENADORES** podem registrar novos usuários no sistema.
- *
- *       Tipos permitidos para o usuário:
- *       - **ADMIN**
- *       - **COORDENADOR**
- *       - **PROFESSOR**
- *       - **ALUNO**
- *
- *       Regras de criação:
- *       - **ADMIN** e **COORDENADOR** → não criam aluno
- *       - **ALUNO** → sempre cria aluno do tipo **COMUM**
- *       - **PROFESSOR**:
- *         - Se enviar dados de aluno → cria aluno do tipo **ALUNO_PROFESSOR**
- *         - Se não enviar → cria só o usuário professor
- *
+ *     summary: Registrar um novo usuário
+ *     description: "Registro contendo informações completas do usuário. Tipos com acesso ao sistema (email + senha): ADMIN, PROFESSOR, COORDENADOR e ALUNO_PROFESSOR."
  *     tags:
  *       - auth
  *     security:
@@ -54,30 +38,121 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/RegisterUser'
+ *             type: object
+ *             required:
+ *               - nome
+ *               - tipo
+ *               - cpf
+ *               - dataNascimento
+ *               - genero
+ *
+ *             properties:
+ *               nome:
+ *                 type: string
+ *                 example: "Renato José de Souza"
+ *
+ *               nome_social:
+ *                 type: string
+ *                 example: "Ranni"
+ *
+ *               tipo:
+ *                 type: string
+ *                 enum: [ADMIN, COORDENADOR, PROFESSOR, ALUNO, ALUNO_PROFESSOR]
+ *                 example: "ALUNO"
+ *
+ *               endereco:
+ *                 type: string
+ *                 example: "Rua Obi Jucá Diniz, 153 - Prado"
+ *
+ *               dataNascimento:
+ *                 type: string
+ *                 example: "2008-12-07"
+ *
+ *               cpf:
+ *                 type: string
+ *                 example: "03444483040"
+ *
+ *               telefone:
+ *                 type: string
+ *                 example: "(88)99583-8843"
+ *
+ *               genero:
+ *                 type: string
+ *                 enum: [M, F, O]
+ *                 example: "F"
+ *
+ *               responsaveis:
+ *                 type: array
+ *                 description: "Apenas telefone será armazenado"
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     telefone:
+ *                       type: string
+ *                       example: "(88)91234-5678"
+ *
+ *               id_faixa:
+ *                 type: string
+ *                 example: "4bb48c3d-62a3-41ca-8834-88d575d80d2c"
+ *
+ *               grau:
+ *                 type: number
+ *                 example: 1
+ *
+ *               num_matricula:
+ *                 type: string
+ *                 nullable: true
+ *                 example: null
+ *
+ *               turmaIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["724fb34c-c53b-483f-988d-f8a79fcdc602"]
+ *
+ *               aulas:
+ *                 type: number
+ *                 nullable: true
+ *                 example: null
+ *
+ *               email:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Apenas para ADMIN, PROFESSOR, COORDENADOR e ALUNO_PROFESSOR"
+ *
+ *               password:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Apenas para ADMIN, PROFESSOR, COORDENADOR e ALUNO_PROFESSOR"
+ *
+ *             example:
+ *               nome: "Renato José de Souza"
+ *               nome_social: "Ranni"
+ *               tipo: "ALUNO"
+ *               endereco: "Rua Obi Jucá Diniz, 153 - Prado"
+ *               dataNascimento: "2008-12-07"
+ *               cpf: "03444483040"
+ *               telefone: "(88)99583-8843"
+ *               genero: "F"
+ *               responsaveis:
+ *                 - telefone: "(88)91234-5678"
+ *               id_faixa: "4bb48c3d-62a3-41ca-8834-88d575d80d2c"
+ *               grau: 1
+ *               num_matricula: null
+ *               turmaIds: ["724fb34c-c53b-483f-988d-f8a79fcdc602"]
+ *               aulas: null
+ *               email: null
+ *               password: null
  *
  *     responses:
  *       201:
- *         description: Usuário criado com sucesso (com ou sem aluno)
- *       403:
- *         description: Apenas coordenadores podem criar usuários
- *       409:
- *         description: Email ou CPF já cadastrado
+ *         description: "Usuário criado com sucesso"
  */
 
-/**
- * Rota de registro de usuário
- *
- * Middlewares:
- * - authenticate → exige token JWT válido
- * - authorize("COORDENADOR") → só COORDENADOR pode criar usuários
- * - validateBody(registerSchema) → valida o JSON do body
- * - register → controller que faz toda a lógica
- */
 router.post(
   "/register",
   authenticate,
-  authorize("COORDENADOR"),
+  authorize("COORDENADOR"), // quem pode criar usuários
   validateBody(registerSchema),
   register
 );

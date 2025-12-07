@@ -10,6 +10,8 @@ import turmaRoutes from "./src/routes/turmas_routes.js";
 import responsavelRoutes from "./src/routes/responsavel_routes.js";
 import alunoRoutes from "./src/routes/aluno_routes.js"
 import faixaRoutes from "./src/routes/faixa_routes.js";
+import relatorioRoutes from "./src/routes/relatorio_routes.js"
+import aniversariosRoutes from "./src/routes/aniversario_routes.js"
 
 //import graduacaoRoutes from "./src/routes/graduacao_routes.js";
 
@@ -64,6 +66,8 @@ app.use("/turmas", turmaRoutes);
 app.use("/responsaveis", responsavelRoutes);
 app.use("/alunos", alunoRoutes);
 app.use("/faixas", faixaRoutes);
+app.use("/relatorio", relatorioRoutes)
+app.use("/aniversariantes", aniversariosRoutes)
 //app.use("/graduacoes", graduacaoRoutes);
 // app.use("/alunos", alunoRoutes);
 

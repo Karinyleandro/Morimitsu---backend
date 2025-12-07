@@ -1,370 +1,322 @@
 import bcrypt from "bcrypt";
 import prisma from "../prisma.js";
-import { validarCPF } from "../utils/validacao_cpf.js";
 
+// ==================== AUXILIARES ====================
 const SALT_ROUNDS = 10;
 
-// Gera hash seguro do ID (para não expor IDs reais na API)
-async function hashId(id) {
-  return await bcrypt.hash(id.toString(), SALT_ROUNDS);
+function calcularIdade(dataNascimento) {
+  if (!dataNascimento) return 0;
+  const birth = new Date(dataNascimento);
+  const now = new Date();
+  let idade = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) idade--;
+  return idade;
 }
 
-// Busca usuário a partir de hash do ID
-async function encontrarUsuarioPorHash(hash) {
-  const usuarios = await prisma.usuario.findMany({ include: { aluno: true } });
-  for (const u of usuarios) {
-    if (await bcrypt.compare(u.id.toString(), hash)) return u;
+// ==================== LISTAR USUÁRIOS ====================
+export const listarUsuarios = async (req, res) => {
+  try {
+    // Apenas ADMIN pode listar todos
+    if (!["ADMIN", "COORDENADOR"].includes(req.user.tipo)) {
+  return res.status(403).json({ message: "Acesso negado" });
+}
+
+
+    const { nome, tipo, page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const filtro = {
+      ...(nome ? { nome: { contains: nome, mode: "insensitive" } } : {}),
+      ...(tipo ? { tipo } : {}),
+    };
+
+    const total = await prisma.usuario.count({ where: filtro });
+
+    const usuarios = await prisma.usuario.findMany({
+      where: filtro,
+      skip,
+      take: Number(limit),
+      orderBy: { nome: "asc" },
+      include: {
+        responsaveis: true,
+        turma_matriculas: { include: { turma: true } },
+        faixa: true,
+      },
+    });
+
+    res.json({
+      sucesso: true,
+      total,
+      paginaAtual: Number(page),
+      totalPaginas: Math.ceil(total / limit),
+      dados: usuarios,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erro ao listar usuários", detalhe: error.message });
   }
-  return null;
-}
+};
 
+// ==================== OBTER DETALHADO ====================
 export const obterUsuarioDetalhado = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Buscar usuário ou aluno
-    let usuario = await prisma.usuario.findUnique({
+    // Se não for ADMIN, só pode ver seu próprio usuário
+    if (!["ADMIN", "COORDENADOR"].includes(req.user.tipo) && req.user.sub !== id) {
+  return res.status(403).json({ message: "Acesso negado" });
+}
+
+
+    const usuario = await prisma.usuario.findUnique({
       where: { id },
-      include: { aluno: { include: { faixa: true, historicoGraduacoes: true } } } // incluir faixa e histórico se aluno
-    });
-
-    let aluno = null;
-
-    if (!usuario) {
-      // Se não encontrar como usuário, buscar como aluno
-      aluno = await prisma.aluno.findUnique({
-        where: { id },
-        include: { usuario: true, faixa: true, historicoGraduacoes: true }
-      });
-
-      if (!aluno) return res.status(404).json({ message: "Usuário/Aluno não encontrado" });
-      usuario = aluno.usuario; // pode ser null se aluno não tiver usuário
-    }
-
-    // Montar objeto de resposta
-    const dados = {
-      id: usuario?.id || aluno.id,
-      nome_completo: aluno?.nome || usuario?.nome,
-      nome_social: aluno?.nome_social || usuario?.nome_social,
-      cpf: aluno?.cpf || usuario?.cpf,
-      data_nascimento: aluno?.dataNascimento || usuario?.dataNascimento,
-      endereco: aluno?.endereco || usuario?.endereco,
-      telefone: aluno?.telefone || usuario?.telefone,
-      genero: aluno?.genero || usuario?.genero,
-      cargo: usuario?.tipo || aluno?.tipo || "Aluno(a)",
-      imagem_perfil_url: aluno?.imagem_perfil_url || usuario?.imagem_perfil_url || null,
-      faixa_atual: aluno?.faixa?.nome || null,
-      grau_atual: aluno?.grau || null,
-      turma: aluno?.turma || null,
-      matricula: aluno?.num_matricula || null,
-      telefone_responsavel: aluno?.telefone_responsavel || null,
-      historico_graduacoes: aluno?.historicoGraduacoes || []
-    };
-
-    res.json({ sucesso: true, dados });
-
-  } catch (error) {
-    console.error("Erro ao buscar usuário detalhado:", error);
-    res.status(500).json({ sucesso: false, message: "Erro ao buscar usuário", detalhe: error.message });
-  }
-};
-
-
-export const listarUsuarios = async (req, res) => {
-  try {
-    const { nome } = req.query;
-
-    // Construir filtro para nome (caso seja fornecido)
-    const filtroNome = nome
-      ? {
-          nome: {
-            contains: nome,
-            mode: "insensitive" // para não diferenciar maiúsculas/minúsculas
-          }
-        }
-      : {};
-
-    // Buscar todos os usuários incluindo aluno e faixa
-    const usuarios = await prisma.usuario.findMany({
-      where: filtroNome,
       include: {
-        aluno: {
-          include: {
-            faixa: true
-          }
-        }
-      }
+        responsaveis: true,
+        turma_matriculas: { include: { turma: true } },
+        faixa: true,
+      },
     });
 
-    // Buscar alunos que não possuem usuário, incluindo faixa
-    const alunosSemUsuario = await prisma.aluno.findMany({
-      where: { usuarioId: null, ...filtroNome },
-      include: { faixa: true }
-    });
+    if (!usuario) return res.status(404).json({ message: "Usuário não encontrado" });
 
-    // Formatar usuários
-    const usuariosFormatados = usuarios.map(u => {
-      const imagemFaixa = u.aluno?.faixa?.imagem_faixa_url || null;
-      return {
-        id: u.id,
-        nome: u.nome,
-        cargo: u.tipo || u.aluno?.tipo || null,
-        imagem_perfil_url: u.imagem_perfil_url || u.aluno?.imagem_perfil_url || null,
-        imagem_faixa_url: imagemFaixa
-      };
-    });
-
-    // Formatar alunos sem usuário
-    const alunosFormatados = alunosSemUsuario.map(a => {
-      const imagemFaixa = a.faixa?.imagem_faixa_url || null;
-      return {
-        id: a.id,
-        nome: a.nome,
-        cargo: a.tipo || null,
-        imagem_perfil_url: a.imagem_perfil_url || null,
-        imagem_faixa_url: imagemFaixa
-      };
-    });
-
-    res.status(200).json({
-      sucesso: true,
-      total: usuariosFormatados.length + alunosFormatados.length,
-      dados: [...usuariosFormatados, ...alunosFormatados]
-    });
-
-  } catch (error) {
-    console.error("Erro ao listar usuários:", error);
-    res.status(500).json({
-      sucesso: false,
-      mensagem: "Erro ao buscar usuários.",
-      detalhe: error.message
-    });
-  }
-};
-
-export const criarUsuario = async (req, res) => {
-  try {
-    const {
-      nome, nome_social, email, cpf, dataNascimento, telefone,
-      endereco, genero, tipo, imagem_perfil_url,
-      num_matricula, grau, id_faixa, cargo_aluno
-    } = req.body;
-
-    if (!nome) return res.status(400).json({ message: "Campo 'nome' é obrigatório" });
-
-    // Verificar CPF duplicado
-    if (cpf) {
-      if (!validarCPF(cpf)) return res.status(400).json({ message: "CPF inválido" });
-      const cpfExistenteUsuario = await prisma.usuario.findUnique({ where: { cpf } });
-      const cpfExistenteAluno = await prisma.aluno.findUnique({ where: { cpf } });
-      if (cpfExistenteUsuario || cpfExistenteAluno) return res.status(409).json({ message: "CPF já cadastrado" });
-    }
-
-    // Criar usuário
-    const usuario = await prisma.usuario.create({
-      data: {
-        nome,
-        nome_social,
-        email,
-        cpf,
-        dataNascimento: dataNascimento ? new Date(dataNascimento) : undefined,
-        telefone,
-        endereco,
-        genero,
-        tipo,
-        imagem_perfil_url,
-      }
-    });
-
-    // Se enviar dados de aluno, criar aluno vinculado
-    let aluno = null;
-    if (num_matricula || grau || id_faixa || cargo_aluno) {
-      aluno = await prisma.aluno.create({
-        data: {
-          nome,
-          nome_social,
-          cpf,
-          dataNascimento: dataNascimento ? new Date(dataNascimento) : undefined,
-          telefone,
-          endereco,
-          genero,
-          num_matricula,
-          grau,
-          id_faixa,
-          tipo: "COMUM",
-          cargo: cargo_aluno,
-          usuarioId: usuario.id
-        }
-      });
-    }
-
-    const resultado = await prisma.usuario.findUnique({ where: { id: usuario.id }, include: { aluno: true } });
-
-    res.status(201).json({ message: "Usuário criado com sucesso", dados: resultado });
-  } catch (error) {
-    console.error("Erro ao criar usuário:", error);
-    res.status(500).json({ message: "Erro ao criar usuário", detalhe: error.message });
-  }
-};
-
-export const atualizarUsuario = async (req, res) => {
-  const { id } = req.params;
-  const {
-    nome, nome_social, email, cpf, num_matricula, dataNascimento,
-    telefone, endereco, grau, genero, tipo, imagem_perfil_url,
-    ativo, ultimo_login, id_faixa, cargo_aluno
-  } = req.body;
-
-  try {
-    // Buscar usuario ou aluno
-    let usuarioExistente = await prisma.usuario.findUnique({
-      where: { id },
-      include: { aluno: true }
-    });
-
-    let alunoExistente = null;
-
-    // Se não houver usuario, procurar aluno
-    if (!usuarioExistente) {
-      alunoExistente = await prisma.aluno.findUnique({ where: { id }, include: { usuario: true } });
-      if (!alunoExistente) return res.status(404).json({ message: "Usuário/Aluno não encontrado" });
-      usuarioExistente = alunoExistente.usuario;
-    }
-
-    const usuarioAtual = req.user;
-    if (usuarioAtual.sub !== id && usuarioAtual.tipo !== "COORDENADOR") return res.status(403).json({ message: "Acesso negado" });
-
-    const dataAtualizacaoUsuario = {};
-    const dataAtualizacaoAluno = {};
-
-    // Campos de usuario
-    if (nome) dataAtualizacaoUsuario.nome = nome.trim();
-    if (nome_social) dataAtualizacaoUsuario.nome_social = nome_social.trim();
-    if (email && usuarioExistente) dataAtualizacaoUsuario.email = email.trim().toLowerCase();
-    if (cpf) {
-      if (!validarCPF(cpf)) return res.status(400).json({ message: "CPF inválido" });
-      dataAtualizacaoUsuario.cpf = cpf;
-      dataAtualizacaoAluno.cpf = cpf;
-    }
-    if (telefone) { dataAtualizacaoUsuario.telefone = telefone; dataAtualizacaoAluno.telefone = telefone; }
-    if (endereco) { dataAtualizacaoUsuario.endereco = endereco.trim(); dataAtualizacaoAluno.endereco = endereco.trim(); }
-    if (dataNascimento) { dataAtualizacaoUsuario.dataNascimento = new Date(dataNascimento); dataAtualizacaoAluno.dataNascimento = new Date(dataNascimento); }
-    if (genero) { dataAtualizacaoUsuario.genero = genero; dataAtualizacaoAluno.genero = genero; }
-    if (tipo && usuarioExistente) dataAtualizacaoUsuario.tipo = tipo;
-    if (imagem_perfil_url) { dataAtualizacaoUsuario.imagem_perfil_url = imagem_perfil_url; dataAtualizacaoAluno.imagem_perfil_url = imagem_perfil_url; }
-    if (ativo !== undefined && usuarioExistente) dataAtualizacaoUsuario.ativo = Boolean(ativo);
-    if (ultimo_login && usuarioExistente) dataAtualizacaoUsuario.ultimo_login = new Date(ultimo_login);
-
-    // Campos de aluno
-    if (num_matricula !== undefined) dataAtualizacaoAluno.num_matricula = num_matricula;
-    if (grau !== undefined) dataAtualizacaoAluno.grau = grau;
-    if (id_faixa !== undefined) dataAtualizacaoAluno.id_faixa = id_faixa;
-    if (cargo_aluno !== undefined) dataAtualizacaoAluno.cargo = cargo_aluno;
-
-    // Transação
-    await prisma.$transaction(async tx => {
-      if (usuarioExistente && Object.keys(dataAtualizacaoUsuario).length > 0) {
-        dataAtualizacaoUsuario.atualizado_em = new Date();
-        await tx.usuario.update({ where: { id: usuarioExistente.id }, data: dataAtualizacaoUsuario });
-      }
-
-      if ((usuarioExistente?.aluno || alunoExistente) && Object.keys(dataAtualizacaoAluno).length > 0) {
-        const alunoId = alunoExistente ? alunoExistente.id : usuarioExistente.aluno.id;
-        dataAtualizacaoAluno.atualizado_em = new Date();
-        await tx.aluno.update({ where: { id: alunoId }, data: dataAtualizacaoAluno });
-      }
-    });
-
-    const atualizado = alunoExistente
-      ? await prisma.aluno.findUnique({ where: { id: alunoExistente.id }, include: { usuario: true } })
-      : await prisma.usuario.findUnique({ where: { id }, include: { aluno: true } });
-
-    res.json({ message: "Usuário/Aluno atualizado com sucesso", dados: atualizado });
+    res.json({ sucesso: true, usuario });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Erro ao atualizar usuário/aluno", detalhe: error.message });
+    res.status(500).json({ message: "Erro interno", detalhe: error.message });
   }
 };
 
+// ==================== ATUALIZAR PERFIL DO USUÁRIO ====================
+export const atualizarPerfil = async (req, res) => {
+  try {
+    const usuarioId = req.params.id; // ID do usuário que será atualizado
+    const { id: logadoId, tipo: tipoLogado } = req.user; // usuário autenticado
+    
+    // Apenas usuários autorizados
+    const tiposPermitidos = ["PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR"];
+    if (!tiposPermitidos.includes(tipoLogado)) {
+      return res.status(403).json({ message: "Acesso negado" });
+    }
+
+    // Só pode atualizar seu próprio perfil
+    if (usuarioId !== logadoId) {
+      return res.status(403).json({ message: "Você só pode atualizar seu próprio perfil" });
+    }
+
+    const {
+      nome,
+      dataNascimento,
+      cpf,
+      genero,
+      email,
+      endereco,
+      password,
+      telefone,
+      imagem_perfil_url
+    } = req.body;
+
+    // Monta objeto de atualização dinamicamente
+    const dataToUpdate = {};
+    if (nome !== undefined) dataToUpdate.nome = nome;
+    if (dataNascimento !== undefined) dataToUpdate.dataNascimento = new Date(dataNascimento);
+    if (cpf !== undefined) dataToUpdate.cpf = cpf;
+    if (genero !== undefined) dataToUpdate.genero = genero;
+    if (email !== undefined) dataToUpdate.email = email;
+    if (endereco !== undefined) dataToUpdate.endereco = endereco;
+    if (telefone !== undefined) dataToUpdate.telefone = telefone;
+    if (imagem_perfil_url !== undefined) dataToUpdate.imagem_perfil_url = imagem_perfil_url;
+    if (password !== undefined) {
+      dataToUpdate.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    }
+
+    // Atualiza o usuário no banco
+    const updatedUser = await prisma.usuario.update({
+      where: { id: usuarioId },
+      data: dataToUpdate,
+      select: {
+        id: true,
+        nome: true,
+        dataNascimento: true,
+        cpf: true,
+        genero: true,
+        email: true,
+        endereco: true,
+        telefone: true,
+        imagem_perfil_url: true
+      }
+    });
+
+    return res.status(200).json({
+      message: "Perfil atualizado com sucesso",
+      user: updatedUser
+    });
+
+  } catch (error) {
+    console.error("Erro ao atualizar perfil:", error);
+    return res.status(500).json({ message: "Erro interno do servidor", error: error.message });
+  }
+};
+
+// ==================== ATUALIZAR USUÁRIO ====================
+export const atualizarUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      nome,
+      nome_social,
+      tipo,
+      endereco,
+      dataNascimento,
+      cpf,
+      telefone,
+      genero,
+      responsaveis = [],
+      id_faixa,
+      grau,
+      num_matricula,
+      turmaIds = [],
+      aulas,
+      email,
+      password,
+      imagem_perfil_url,
+      ativo,
+    } = req.body;
+
+    const tiposAlunos = ["ALUNO", "ALUNO_PROFESSOR"];
+
+    // Calcula idade
+    const idade = dataNascimento ? calcularIdade(dataNascimento) : null;
+
+    // Valida responsáveis para alunos menores de 18 anos
+    if (tiposAlunos.includes(tipo) && idade !== null && idade < 18) {
+      if (!responsaveis || responsaveis.length === 0) {
+        return res.status(400).json({
+          message: "Aluno menor de 18 anos precisa de pelo menos um responsável",
+        });
+      }
+    }
+
+    // Prepara dados de responsáveis
+    const responsaveisData =
+      responsaveis.length > 0
+        ? {
+            deleteMany: {}, // remove os anteriores
+            create: responsaveis.map((r) => ({
+              telefone: r.telefone,
+              nome: r.nome || null,
+              email: r.email || null,
+              grau_parentesco: "Responsável",
+            })),
+          }
+        : undefined;
+
+    // Prepara dados das turmas
+    const turmaData =
+      turmaIds.length > 0
+        ? {
+            deleteMany: {},
+            create: turmaIds.map((turmaId) => ({
+              turma: { connect: { id: turmaId } },
+              ativo: true,
+              frequencia_acumulada: 0,
+            })),
+          }
+        : undefined;
+
+    // Monta objeto data apenas com campos definidos
+    const dataToUpdate = {};
+
+    if (nome !== undefined) dataToUpdate.nome = nome;
+    if (nome_social !== undefined) dataToUpdate.nome_social = nome_social;
+    if (tipo !== undefined) dataToUpdate.tipo = tipo;
+    if (endereco !== undefined) dataToUpdate.endereco = endereco;
+    if (dataNascimento !== undefined)
+      dataToUpdate.dataNascimento = new Date(dataNascimento);
+    if (cpf !== undefined) dataToUpdate.cpf = cpf;
+    if (telefone !== undefined) dataToUpdate.telefone = telefone;
+    if (genero !== undefined) dataToUpdate.genero = genero;
+    if (email !== undefined) dataToUpdate.email = email;
+    if (password !== undefined)
+      dataToUpdate.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    if (grau !== undefined) dataToUpdate.grau = grau;
+    if (num_matricula !== undefined) dataToUpdate.num_matricula = num_matricula;
+    if (aulas !== undefined) dataToUpdate.aulas = aulas;
+    if (ativo !== undefined) dataToUpdate.ativo = ativo;
+    if (imagem_perfil_url !== undefined)
+      dataToUpdate.imagem_perfil_url = imagem_perfil_url;
+    if (id_faixa !== undefined)
+      dataToUpdate.faixa = { connect: { id: id_faixa } };
+    if (responsaveisData !== undefined) dataToUpdate.responsaveis = responsaveisData;
+    if (turmaData !== undefined) dataToUpdate.turma_matriculas = turmaData;
+
+    // Atualiza usuário
+    const updatedUser = await prisma.usuario.update({
+      where: { id },
+      data: dataToUpdate,
+      include: {
+        faixa: true,
+        responsaveis: true,
+        turma_matriculas: { include: { turma: true } },
+      },
+    });
+
+    return res
+      .status(200)
+      .json({ message: "Usuário atualizado com sucesso", user: updatedUser });
+  } catch (error) {
+    console.error("Erro ao atualizar usuário:", error);
+    return res
+      .status(500)
+      .json({ message: "Erro interno do servidor", error: error.message });
+  }
+};
+
+// ==================== DELETAR USUÁRIO ====================
 export const deletarUsuario = async (req, res) => {
   try {
     const { id } = req.params;
-    const usuarioAtual = req.user;
 
-    if (usuarioAtual.tipo !== "COORDENADOR") return res.status(403).json({ message: "Apenas coordenadores podem deletar usuários" });
+    // Apenas ADMIN pode deletar usuários
+    if (!["ADMIN", "COORDENADOR"].includes(req.user.tipo)) {
+  return res.status(403).json({ message: "Acesso negado" });
+}
 
-    let usuarioExistente = await prisma.usuario.findUnique({ where: { id }, include: { aluno: true } });
-    let alunoExistente = null;
 
-    if (!usuarioExistente) {
-      alunoExistente = await prisma.aluno.findUnique({ where: { id }, include: { usuario: true } });
-      if (!alunoExistente) return res.status(404).json({ message: "Usuário/Aluno não encontrado" });
-      usuarioExistente = alunoExistente.usuario;
-    }
-
-    // Deletar transação
-    await prisma.$transaction(async tx => {
-      if (alunoExistente) {
-        await tx.aluno.delete({ where: { id: alunoExistente.id } });
-      } else if (usuarioExistente?.aluno) {
-        await tx.aluno.delete({ where: { id: usuarioExistente.aluno.id } });
-      }
-      if (usuarioExistente) {
-        await tx.usuario.delete({ where: { id: usuarioExistente.id } });
-      }
-    });
-
-    res.json({ message: "Usuário/Aluno deletado com sucesso" });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ message: "Erro interno" });
+    await prisma.usuario.delete({ where: { id } });
+    res.json({ message: "Usuário deletado com sucesso" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erro ao deletar usuário", detalhe: error.message });
   }
 };
 
+// ==================== ATUALIZAR FOTO ====================
 export const atualizarFotoUsuario = async (req, res) => {
   try {
     const { id } = req.params;
     const { fotoUrl } = req.body;
-    const usuarioAtual = req.user;
 
-    let usuarioExistente = await prisma.usuario.findUnique({ where: { id }, include: { aluno: true } });
-    let alunoExistente = null;
+    if (!fotoUrl) return res.status(400).json({ message: "Foto URL é obrigatória" });
 
-    if (!usuarioExistente) {
-      alunoExistente = await prisma.aluno.findUnique({ where: { id } });
-      if (!alunoExistente) return res.status(404).json({ message: "Usuário/Aluno não encontrado" });
-      usuarioExistente = alunoExistente.usuario;
+    // Só ADMIN ou o próprio usuário podem atualizar
+    if (req.user.tipo !== "ADMIN" && req.user.sub !== id) {
+      return res.status(403).json({ message: "Acesso negado" });
     }
 
-    if (usuarioAtual.sub !== id && usuarioAtual.tipo !== "COORDENADOR") return res.status(403).json({ message: "Acesso negado" });
-
-    if (!fotoUrl) return res.status(400).json({ message: "URL da imagem é obrigatória" });
-    try { new URL(fotoUrl); } catch { return res.status(400).json({ message: "URL inválida" }); }
-
-    const extensoesPermitidas = [".jpg", ".jpeg", ".png"];
-    if (!extensoesPermitidas.some(ext => fotoUrl.toLowerCase().endsWith(ext))) return res.status(400).json({ message: "Formato de imagem inválido" });
-
-    // Atualizar transação
-    await prisma.$transaction(async tx => {
-      if (usuarioExistente) await tx.usuario.update({ where: { id: usuarioExistente.id }, data: { imagem_perfil_url: fotoUrl } });
-      if (alunoExistente || usuarioExistente?.aluno) {
-        const alunoId = alunoExistente ? alunoExistente.id : usuarioExistente.aluno.id;
-        await tx.aluno.update({ where: { id: alunoId }, data: { imagem_perfil_url: fotoUrl } });
+    const usuarioAtualizado = await prisma.usuario.update({
+      where: { id },
+      data: { imagem_perfil_url: fotoUrl },
+      include: {
+        responsaveis: true,
+        turma_matriculas: { include: { turma: true } },
+        faixa: true,
       }
     });
 
-    res.json({ message: "Foto atualizada com sucesso" });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ message: "Erro interno" });
+    res.json({ sucesso: true, usuario: usuarioAtualizado });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erro ao atualizar foto do usuário", detalhe: error.message });
   }
-};
-
-export default {
-  obterUsuarioDetalhado,
-  listarUsuarios,
-  criarUsuario, 
-  atualizarUsuario, 
-  deletarUsuario, 
-  atualizarFotoUsuario 
 };

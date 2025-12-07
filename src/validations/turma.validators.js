@@ -3,9 +3,6 @@ import { z } from "zod";
 
 /**
  * Retorna resposta padrão de erro
- * @param {import("express").Response} res
- * @param {string} mensagem
- * @param {number} status
  */
 export const padraoRespostaErro = (res, mensagem, status = 400) => {
   return res.status(status).json({ mensagem });
@@ -15,31 +12,49 @@ export const padraoRespostaErro = (res, mensagem, status = 400) => {
  * Schema para criar turma
  */
 export const criarTurmaSchema = z.object({
-  nome: z.string().min(2, { message: "O nome da turma deve ter pelo menos 2 caracteres." }),
-  faixaEtaria: z.enum(["Infantil", "Fundamental"], { 
-    errorMap: () => ({ message: "Faixa etária inválida." }) 
+  nome: z.string().min(2, {
+    message: "O nome da turma deve ter pelo menos 2 caracteres."
   }),
-  totalAulas: z.number().int().min(1, { message: "O total de aulas deve ser positivo." }),
-  professorResponsavel: z.number().int().optional(),
+
+  responsavelId: z.string().uuid({
+    message: "O ID do responsável deve ser um UUID válido."
+  }),
+
+  faixaEtariaMin: z.number().int().min(1, {
+    message: "A idade mínima deve ser positiva."
+  }),
+
+  faixaEtariaMax: z.number().int().min(1, {
+    message: "A idade máxima deve ser positiva."
+  }),
+
+  fotoTurmaUrl: z.string().url().optional().nullable(),
 });
 
 /**
  * Schema para atualizar turma
  */
 export const atualizarTurmaSchema = z.object({
-  nome: z.string().min(2, { message: "O nome da turma deve ter pelo menos 2 caracteres." }).optional(),
-  faixaEtaria: z.enum(["Infantil", "Fundamental"], { 
-    errorMap: () => ({ message: "Faixa etária inválida." }) 
+  nome: z.string().min(2, {
+    message: "O nome da turma deve ter pelo menos 2 caracteres."
   }).optional(),
-  totalAulas: z.number().int().min(1, { message: "O total de aulas deve ser positivo." }).optional(),
-  professorResponsavel: z.number().int().optional(),
+
+  responsavelId: z.string().uuid().optional(),
+
+  faixaEtariaMin: z.number().int().min(1).optional(),
+
+  faixaEtariaMax: z.number().int().min(1).optional(),
+
+  fotoTurmaUrl: z.string().url().optional().nullable(),
 });
 
 /**
  * Schema para adicionar aluno à turma
  */
 export const adicionarAlunoTurmaSchema = z.object({
-  alunoId: z.number().int({ message: "ID de aluno inválido." }),
+  alunoId: z.string().uuid({
+    message: "ID de aluno inválido."
+  }),
 });
 
 /**
@@ -50,18 +65,19 @@ export const registrarFrequenciaSchema = z.object({
     (val) => !isNaN(Date.parse(val)),
     { message: "Data inválida." }
   ),
-  frequencias: z
-    .array(
-      z.object({
-        alunoId: z.number().int(),
-        presente: z.boolean(),
-      })
-    )
-    .nonempty({ message: "É necessário registrar ao menos uma frequência." }),
+
+  frequencias: z.array(
+    z.object({
+      alunoId: z.string().uuid(),
+      presente: z.boolean(),
+    })
+  ).nonempty({
+    message: "É necessário registrar ao menos uma frequência."
+  }),
 });
 
 /**
- * Schema de filtro para listar turmas (opcional)
+ * Schema de filtro para listar turmas
  */
 export const listarTurmasSchema = z.object({
   faixaEtaria: z.enum(["Infantil", "Fundamental"]).optional(),

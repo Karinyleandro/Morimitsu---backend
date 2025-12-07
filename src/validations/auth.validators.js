@@ -1,50 +1,96 @@
 import { z } from "zod";
 
-export const registerSchema = z.object({
-  nome: z.string().min(3),
-  nome_social: z.string().optional().nullable(),
-  cpf: z.string().min(11).max(11),
-  dataNascimento: z.string(),
-  telefone: z.string().optional(),
-  endereco: z.string().optional(),
-  genero: z.enum(["M", "F", "O"]),
-  imagem_perfil_url: z.string().optional().nullable(),
-  email: z.string().email(),
-  password: z.string().min(6),
-  cargo: z.enum(["ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO"]),
-  num_matricula: z.string().optional().nullable(),
-  grau: z.number().optional().nullable(),
-  id_faixa: z.string().optional().nullable(),
+// REGISTER
+export const registerSchema = z
+  .object({
+    nome: z.string().min(1, "Nome é obrigatório"),
+    nome_social: z.string().optional().nullable(),
+    tipo: z.enum(["ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO", "ALUNO_PROFESSOR"]),
+    endereco: z.string().optional().nullable(),
+    dataNascimento: z
+      .string()
+      .refine((date) => !isNaN(Date.parse(date)), { message: "Data inválida" }),
+    cpf: z.string().min(1, "CPF é obrigatório"),
+    telefone: z.string().optional().nullable(),
+    genero: z.enum(["M", "F", "O"]),
 
-  responsaveis: z
-    .array(
-      z.object({
-        nome: z.string(),
-        telefone: z.string(),
-        grau_parentesco: z.string(),
-        email: z.string().email().optional().nullable(),
-      })
-    )
-    .optional(),
+    // Array de responsáveis (sempre array, nunca null)
+    responsaveis: z
+      .array(
+        z.object({
+          telefone: z.string().min(1, "Telefone do responsável é obrigatório"),
+          nome: z.string().optional().nullable(),
+          email: z.string().email().optional().nullable(),
+        })
+      )
+      .optional()
+      .default([]),
 
-  turmaIds: z.array(z.string()).optional(),
-});
+    id_faixa: z.string().optional().nullable(),
+    grau: z.number().optional().nullable(),
+    num_matricula: z.string().optional().nullable(),
 
+    // Array de turmas (sempre array)
+    turmaIds: z.array(z.string()).optional().default([]),
+
+    aulas: z.number().optional().nullable(),
+
+    email: z.string().email().nullable().optional(), // opcional para COORDENADOR/PROFESSOR
+    password: z.string().nullable().optional(),      // opcional para COORDENADOR/PROFESSOR
+  })
+  .superRefine((data, ctx) => {
+    // Apenas ADMIN e ALUNO_PROFESSOR precisam obrigatoriamente de login
+    if (["ADMIN", "ALUNO_PROFESSOR"].includes(data.tipo)) {
+      if (!data.email) {
+        ctx.addIssue({
+          path: ["email"],
+          message: "Email é obrigatório para este tipo de usuário",
+          code: z.ZodIssueCode.custom,
+        });
+      }
+      if (!data.password) {
+        ctx.addIssue({
+          path: ["password"],
+          message: "Senha é obrigatória para este tipo de usuário",
+          code: z.ZodIssueCode.custom,
+        });
+      }
+    }
+
+    // Se for ALUNO menor de 18 anos, precisa de pelo menos 1 responsável
+    if (["ALUNO", "ALUNO_PROFESSOR"].includes(data.tipo)) {
+      const idade = data.dataNascimento
+        ? new Date().getFullYear() - new Date(data.dataNascimento).getFullYear()
+        : null;
+      if (idade !== null && idade < 18 && (!data.responsaveis || data.responsaveis.length === 0)) {
+        ctx.addIssue({
+          path: ["responsaveis"],
+          message: "Aluno menor de 18 anos precisa de pelo menos um responsável",
+          code: z.ZodIssueCode.custom,
+        });
+      }
+    }
+  });
+
+// LOGIN
 export const loginSchema = z.object({
-  identifier: z.string(),
-  password: z.string(),
+  identifier: z.string().min(1, "Identificador é obrigatório"),
+  password: z.string().min(1, "Senha é obrigatória"),
 });
 
+// REQUEST PASSWORD RESET
 export const requestResetSchema = z.object({
-  identifier: z.string(),
+  identifier: z.string().min(1, "Identificador é obrigatório"),
 });
 
+// VERIFY RESET CODE
 export const verifyResetCodeSchema = z.object({
-  code: z.string().length(5),
+  code: z.string().min(1, "Código é obrigatório"),
 });
 
+// RESET PASSWORD
 export const resetPasswordSchema = z.object({
-  code: z.string().length(5),
-  newPassword: z.string().min(6),
-  confirmPassword: z.string().min(6),
+  code: z.string().min(1, "Código é obrigatório"),
+  newPassword: z.string().min(1, "Nova senha é obrigatória"),
+  confirmPassword: z.string().min(1, "Confirmação de senha é obrigatória"),
 });

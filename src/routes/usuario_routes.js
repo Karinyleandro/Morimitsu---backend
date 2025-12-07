@@ -1,50 +1,27 @@
 import express from "express";
-import multer from "multer";
-
 import { validateBody } from "../middlewares/zodMiddleware.js";
-import { authenticate } from "../middlewares/auth.middleware.js";
-
-import { 
+import { authenticate, authorize } from "../middlewares/auth.middleware.js";
+import {
+  listarUsuarios,
   obterUsuarioDetalhado,
-  listarUsuarios, 
-  atualizarUsuario, 
-  deletarUsuario, 
-  atualizarFotoUsuario 
-} from "../controllers/usuario.js";
+  atualizarUsuario,
+  deletarUsuario,
+  atualizarFotoUsuario,
+  atualizarPerfil
 
-import { atualizarUsuarioSchema } from "../validations/usuario.validators.js";
+} from "../controllers/usuario.js";
+import { atualizarUsuarioSchema, atualizarFotoSchema,  atualizarPerfilSchema } from "../validations/usuario.validators.js";
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" }); // upload básico para futuras fotos
 
-/**
- * @openapi
- * /usuarios/{id}:
- *   get:
- *     summary: Obter informações detalhadas de um usuário/aluno
- *     tags:
- *       - usuários
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: ID do usuário ou aluno
- *     responses:
- *       200:
- *         description: Informações detalhadas retornadas com sucesso
- */
-router.get("/:id", authenticate, obterUsuarioDetalhado);
-
-
+/* =====================================================
+   GET – LISTAR USUÁRIOS
+===================================================== */
 /**
  * @openapi
  * /usuarios:
  *   get:
- *     summary: Listar todos os usuários (opcionalmente filtrando por nome)
+ *     summary: Lista todos os usuários (somente ADMIN)
  *     tags:
  *       - usuários
  *     security:
@@ -54,54 +31,72 @@ router.get("/:id", authenticate, obterUsuarioDetalhado);
  *         name: nome
  *         schema:
  *           type: string
- *         description: Filtra usuários cujo nome contenha o valor informado
+ *         description: Filtra usuários pelo nome
+ *       - in: query
+ *         name: tipo
+ *         schema:
+ *           type: string
+ *           enum: [ADMIN, COORDENADOR, PROFESSOR, ALUNO, ALUNO_PROFESSOR]
+ *         description: Filtra usuários por tipo
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
  *     responses:
  *       200:
  *         description: Lista de usuários retornada com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 sucesso:
- *                   type: boolean
- *                 total:
- *                   type: integer
- *                 dados:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                       nome:
- *                         type: string
- *                       cargo:
- *                         type: string
- *                       imagem_perfil_url:
- *                         type: string
- *                       imagem_faixa_url:
- *                         type: string
  */
 router.get("/", authenticate, listarUsuarios);
 
+/* =====================================================
+   GET – DETALHADO
+===================================================== */
 /**
  * @openapi
  * /usuarios/{id}:
- *   put:
- *     summary: Atualizar informações de um usuário
- *     description: Atualiza os dados básicos de um usuário, incluindo a senha. Apenas o próprio usuário, COORDENADOR ou ADMIN podem editar.
+ *   get:
+ *     summary: Obter usuário detalhado
  *     tags:
  *       - usuários
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
+ *       - name: id
+ *         in: path
  *         required: true
- *         description: ID hash do usuário
  *         schema:
  *           type: string
+ *           format: uuid
+ *         description: UUID do usuário
+ *     responses:
+ *       200:
+ *         description: Dados do usuário retornados com sucesso
+ */
+router.get("/:id", authenticate, obterUsuarioDetalhado);
+
+/**
+ * @openapi
+ * /usuarios/perfil/{id}:
+ *   patch:
+ *     summary: Atualizar o próprio perfil do usuário
+ *     tags:
+ *       - usuários
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID do usuário logado
  *     requestBody:
  *       required: true
  *       content:
@@ -111,86 +106,52 @@ router.get("/", authenticate, listarUsuarios);
  *             properties:
  *               nome:
  *                 type: string
- *                 example: "João da Silva"
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "joao@example.com"
- *               cpf:
- *                 type: string
- *                 example: "12345678900"
+ *                 example: "Renato José de Souza"
  *               dataNascimento:
  *                 type: string
- *                 format: date
- *                 example: "2000-05-10"
- *               telefone:
+ *                 example: "2008-12-07"
+ *               cpf:
  *                 type: string
- *                 example: "(11) 99999-8888"
- *               endereco:
- *                 type: string
- *                 example: "Rua das Flores, 123"
+ *                 example: "03444483040"
  *               genero:
  *                 type: string
- *                 enum: [MASCULINO, FEMININO, OUTRO, NAO_INFORMADO]
- *                 example: "MASCULINO"
+ *                 enum: [M, F, O]
+ *                 example: "F"
+ *               email:
+ *                 type: string
+ *                 example: "renato@example.com"
+ *               endereco:
+ *                 type: string
+ *                 example: "Rua Obi Jucá Diniz, 153 - Prado"
+ *               telefone:
+ *                 type: string
+ *                 example: "(88)99583-8843"
+ *               password:
+ *                 type: string
+ *                 example: "minhaSenha123"
  *               imagem_perfil_url:
  *                 type: string
- *                 format: uri
- *                 example: "https://exemplo.com/imagem.jpg"
- *               senha:
- *                 type: string
- *                 format: password
- *                 description: Nova senha do usuário (opcional)
- *                 example: "NovaSenha@123"
+ *                 example: "https://meusite.com/fotos/renato.jpg"
  *     responses:
  *       200:
- *         description: Usuário atualizado com sucesso
- *       400:
- *         description: Dados inválidos
- *       403:
- *         description: Acesso negado
- *       404:
- *         description: Usuário não encontrado
- *       500:
- *         description: Erro interno no servidor
+ *         description: Perfil atualizado com sucesso
  */
-router.put("/:id", authenticate, validateBody(atualizarUsuarioSchema), atualizarUsuario);
+router.patch(
+  "/perfil/:id",
+  authenticate,
+  validateBody(atualizarPerfilSchema),
+  atualizarPerfil
+);
 
+/* =====================================================
+   PUT – ATUALIZAR USUÁRIO
+===================================================== */
 /**
  * @openapi
  * /usuarios/{id}:
- *   delete:
- *     summary: Deletar um usuário
- *     description: Apenas coordenadores podem deletar usuários.
- *     tags:
- *       - usuários
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: ID hash do usuário
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Usuário deletado com sucesso
- *       400:
- *         description: Não é possível deletar o próprio usuário
- *       403:
- *         description: Acesso negado
- *       404:
- *         description: Usuário não encontrado
- */
-router.delete("/:id", authenticate, deletarUsuario);
-
-/**
- * @openapi
- * /usuarios/{id}/foto:
  *   put:
- *     summary: Atualizar foto de perfil do usuário via URL
- *     description: Atualiza o campo imagem_perfil_url de um usuário existente.
+ *     summary: Atualizar um usuário existente
+ *     description: "Atualização contendo todas as informações do usuário. Mesmos campos que o registro."
  *     tags:
  *       - usuários
  *     security:
@@ -199,9 +160,10 @@ router.delete("/:id", authenticate, deletarUsuario);
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID hash do usuário
  *         schema:
  *           type: string
+ *           format: uuid
+ *         description: UUID do usuário
  *     requestBody:
  *       required: true
  *       content:
@@ -209,22 +171,147 @@ router.delete("/:id", authenticate, deletarUsuario);
  *           schema:
  *             type: object
  *             required:
- *               - fotoUrl
+ *               - nome
+ *               - tipo
+ *               - cpf
+ *               - dataNascimento
+ *               - genero
  *             properties:
- *               fotoUrl:
+ *               nome:
  *                 type: string
- *                 format: uri
- *                 example: "https://exemplo.com/foto.jpg"
+ *                 example: "Renato José de Souza"
+ *               nome_social:
+ *                 type: string
+ *                 example: "Ranni"
+ *               tipo:
+ *                 type: string
+ *                 enum: [ADMIN, COORDENADOR, PROFESSOR, ALUNO, ALUNO_PROFESSOR]
+ *                 example: "ALUNO"
+ *               endereco:
+ *                 type: string
+ *                 example: "Rua Obi Jucá Diniz, 153 - Prado"
+ *               dataNascimento:
+ *                 type: string
+ *                 example: "2008-12-07"
+ *               cpf:
+ *                 type: string
+ *                 example: "03444483040"
+ *               telefone:
+ *                 type: string
+ *                 example: "(88)99583-8843"
+ *               genero:
+ *                 type: string
+ *                 enum: [M, F, OUTRO]
+ *                 example: "F"
+ *               responsaveis:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     telefone:
+ *                       type: string
+ *                       example: "(88)91234-5678"
+ *               id_faixa:
+ *                 type: string
+ *                 example: "4bb48c3d-62a3-41ca-8834-88d575d80d2c"
+ *               grau:
+ *                 type: number
+ *                 example: 1
+ *               num_matricula:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "12345"
+ *               turmaIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["724fb34c-c53b-483f-988d-f8a79fcdc602"]
+ *               aulas:
+ *                 type: number
+ *                 nullable: true
+ *                 example: 10
+ *               email:
+ *                 type: string
+ *                 nullable: true
+ *               password:
+ *                 type: string
+ *                 nullable: true
+ *               ativo:
+ *                 type: boolean
+ *                 example: true
+ *               imagem_perfil_url:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Usuário atualizado com sucesso
+ */
+router.put(
+  "/:id",
+  authenticate,
+  authorize("COORDENADOR"), // apenas COORDENADOR ou ADMIN pode atualizar
+  validateBody(atualizarUsuarioSchema),
+  atualizarUsuario
+);
+
+/* =====================================================
+   DELETE – DELETAR USUÁRIO
+===================================================== */
+/**
+ * @openapi
+ * /usuarios/{id}:
+ *   delete:
+ *     summary: Deletar usuário (somente ADMIN)
+ *     tags:
+ *       - usuários
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID do usuário
+ *     responses:
+ *       200:
+ *         description: Usuário deletado com sucesso
+ */
+router.delete("/:id", authenticate, deletarUsuario);
+
+/* =====================================================
+   PUT – ATUALIZAR FOTO
+===================================================== */
+/**
+ * @openapi
+ * /usuarios/{id}/foto:
+ *   put:
+ *     summary: Atualizar foto do usuário
+ *     tags:
+ *       - usuários
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID do usuário
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AtualizarFoto'
+ *           example:
+ *             fotoUrl: "https://meusite.com/fotos/renato.jpg"
  *     responses:
  *       200:
  *         description: Foto atualizada com sucesso
- *       400:
- *         description: URL inválida
- *       403:
- *         description: Acesso negado
- *       404:
- *         description: Usuário não encontrado
  */
-router.put("/:id/foto", authenticate, atualizarFotoUsuario);
+router.put("/:id/foto", authenticate, validateBody(atualizarFotoSchema), atualizarFotoUsuario);
 
 export default router;
