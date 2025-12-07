@@ -1,228 +1,136 @@
-import express from "express";
-const router = express.Router();
+import { Router } from "express";
+import GraduacaoController from "../controllers/GraduacaoController.js";
 
-import { authenticate, authorize } from "../middlewares/auth.middleware.js";
-import GraduacaoController from "../controllers/graduacao.controller.js";
-import { validateBody } from "../middlewares/zodMiddleware.js";
-import { graduarSchema, atualizarGraduacaoSchema } from "../validations/graduacao.validators.js";
+const router = Router();
 
 /**
- * @openapi
+ * @swagger
  * tags:
- *   - name: graduacao
- *     description: Endpoints relacionados às graduações dos alunos
+ *   name: Graduações
+ *   description: Endpoints relacionados ao sistema de graduação dos alunos
  */
 
 /**
- * @openapi
- * /graduacao:
- *   get:
- *     summary: Listar graduações
- *     description: Lista todas as graduações, podendo filtrar por alunoId.
- *     tags:
- *       - graduacao
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: alunoId
- *         schema:
- *           type: integer
- *         example: 12
- *     responses:
- *       200:
- *         description: Lista de graduações retornada com sucesso.
- */
-router.get("/", authenticate, GraduacaoController.listar);
-
-/**
- * @openapi
- * /graduacao/atual/{alunoId}:
- *   get:
- *     summary: Obter última graduação de um aluno
- *     tags:
- *       - graduacao
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: alunoId
- *         required: true
- *         schema:
- *           type: integer
- *         example: 7
- *     responses:
- *       200:
- *         description: Última graduação retornada
- *       404:
- *         description: Nenhuma graduação encontrada
- */
-router.get("/atual/:alunoId", authenticate, GraduacaoController.obterAtual);
-
-/**
- * @openapi
- * /graduacao/historico/{alunoId}:
- *   get:
- *     summary: Listar histórico completo de graduações
- *     tags:
- *       - graduacao
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: alunoId
- *         required: true
- *         schema:
- *           type: integer
- *         example: 7
- *     responses:
- *       200:
- *         description: Histórico retornado com sucesso
- */
-router.get("/historico/:alunoId", authenticate, GraduacaoController.listarHistorico);
-
-/**
- * @openapi
+ * @swagger
  * /graduacao/aptos:
  *   get:
- *     summary: Identificar alunos aptos ou próximos à graduação (RF-022)
- *     description: |
- *       Avalia cada aluno e retorna:
- *       - *pronto*
- *       - *proximo*
- *       - *inapto*
- *
- *       Para adultos (>=16): usa tempos mínimos IBJJF  
- *       Para crianças (<=15): usa lógica de frequência
- *
- *     tags:
- *       - graduacao
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: turmaId
- *         schema:
- *           type: integer
- *         example: 5
- *       - in: query
- *         name: apenas
- *         schema:
- *           type: string
- *           enum: [pronto, proximo]
+ *     summary: Identificar alunos aptos à graduação
+ *     tags: [Graduações]
+ *     description: >
+ *       Retorna todos os alunos com:
+ *       - idade calculada
+ *       - faixa atual
+ *       - próxima faixa
+ *       - presenças acumuladas
+ *       - se estão aptos ou não à graduação
  *     responses:
  *       200:
- *         description: Lista de aptos retornada
+ *         description: Lista de alunos aptos e não aptos retornada com sucesso.
+ *       500:
+ *         description: Erro interno no servidor.
  */
-router.get("/aptos", authenticate, GraduacaoController.identificarAptos);
+router.get("/aptos", GraduacaoController.identificarAptos);
 
 /**
- * @openapi
+ * @swagger
  * /graduacao:
  *   post:
- *     summary: Graduar aluno (RF-023)
- *     description: |
- *       ⚠ **Apenas COORDENADOR pode graduar**  
- *
- *       Regras aplicadas automaticamente:
- *       - Valida aprovação do mestre  
- *       - Verifica tempo mínimo entre faixas (adultos)  
- *       - Impede pular faixas  
- *       - Pode promover automaticamente para *PROFESSOR* ao chegar na *Roxa*  
- *       - Registra log da ação  
- *
- *     tags:
- *       - graduacao
- *     security:
- *       - bearerAuth: []
+ *     summary: Graduar um aluno
+ *     tags: [Graduações]
+ *     description: >
+ *       Apenas coordenadores podem realizar uma graduação.
+ *       O sistema valida automaticamente:
+ *       - idade mínima necessária para a faixa
+ *       - presenças acumuladas
+ *       - proibição de pular faixas
+ *       - aprovação obrigatória do mestre
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: "#/components/schemas/GraduarAlunoRequest"
- *
+ *             type: object
+ *             required:
+ *               - alunoId
+ *               - faixa_id
+ *               - grau
+ *               - aprovado_mestre
+ *             properties:
+ *               alunoId:
+ *                 type: number
+ *                 example: 12
+ *               faixa_id:
+ *                 type: number
+ *                 example: 3
+ *               grau:
+ *                 type: number
+ *                 example: 0
+ *               aprovado_mestre:
+ *                 type: boolean
+ *                 example: true
  *     responses:
  *       201:
  *         description: Aluno graduado com sucesso.
  *       400:
- *         description: Erro de validação ou regras não cumpridas.
+ *         description: >
+ *           Regras não atendidas. Exemplos:
+ *           - Idade mínima não alcançada
+ *           - Presenças insuficientes
+ *           - Tentativa de pular faixas
+ *           - Faltam campos obrigatórios
  *       403:
- *         description: Acesso negado (apenas COORDENADOR)
+ *         description: Apenas coordenadores podem graduar alunos.
  *       404:
- *         description: Aluno ou faixa não encontrada
+ *         description: Aluno ou faixa não encontrada.
+ *       500:
+ *         description: Erro interno no servidor.
  */
-router.post(
-  "/",
-  authenticate,
-  authorize("COORDENADOR"),
-  validateBody(graduarSchema),
-  GraduacaoController.graduar
-);
+router.post("/", GraduacaoController.graduar);
 
 /**
- * @openapi
- * /graduacao/{id}:
- *   put:
- *     summary: Atualizar informações de uma graduação (apenas coordenador)
- *     tags:
- *       - graduacao
- *     security:
- *       - bearerAuth: []
+ * @swagger
+ * /graduacao/historico/{alunoId}:
+ *   get:
+ *     summary: Listar histórico de graduações de um aluno
+ *     tags: [Graduações]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: alunoId
  *         required: true
+ *         description: ID do aluno
  *         schema:
- *           type: integer
- *         example: 10
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: "#/components/schemas/AtualizarGraduacaoRequest"
+ *           type: number
  *     responses:
  *       200:
- *         description: Graduação atualizada com sucesso.
+ *         description: Histórico retornado com sucesso.
  *       404:
- *         description: Graduação não encontrada.
+ *         description: Nenhum histórico encontrado para este aluno.
+ *       500:
+ *         description: Erro interno no servidor.
  */
-router.put(
-  "/:id",
-  authenticate,
-  authorize("COORDENADOR"),
-  validateBody(atualizarGraduacaoSchema),
-  GraduacaoController.atualizar
-);
+router.get("/historico/:alunoId", GraduacaoController.listarHistorico);
 
 /**
- * @openapi
- * /graduacao/{id}:
- *   delete:
- *     summary: Deletar uma graduação (apenas coordenador)
- *     tags:
- *       - graduacao
- *     security:
- *       - bearerAuth: []
+ * @swagger
+ * /graduacao/atual/{alunoId}:
+ *   get:
+ *     summary: Obter a graduação atual do aluno
+ *     tags: [Graduações]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: alunoId
  *         required: true
+ *         description: ID do aluno
  *         schema:
- *           type: integer
- *         example: 10
+ *           type: number
  *     responses:
  *       200:
- *         description: Graduação removida
+ *         description: Faixa atual encontrada e retornada.
  *       404:
- *         description: Não encontrada
+ *         description: Nenhuma graduação encontrada para este aluno.
+ *       500:
+ *         description: Erro interno no servidor.
  */
-router.delete(
-  "/:id",
-  authenticate,
-  authorize("COORDENADOR"),
-  GraduacaoController.deletar
-);
+router.get("/atual/:alunoId", GraduacaoController.obterAtual);
 
 export default router;

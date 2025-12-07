@@ -193,9 +193,9 @@ router.delete(
  *           schema:
  *             type: object
  *             required:
- *               - alunoId
+ *               - usuarioId
  *             properties:
- *               alunoId:
+ *               usuarioId:
  *                 type: string
  *                 format: uuid
  *     responses:
@@ -211,7 +211,7 @@ router.post(
 
 /**
  * @openapi
- * /turmas/{id}/desenturmar/{alunoId}:
+ * /turmas/{id}/desenturmar/{usuarioId}:
  *   delete:
  *     summary: Remove aluno da turma
  *     tags: [Turmas]
@@ -223,7 +223,7 @@ router.post(
  *         schema:
  *           type: string
  *           format: uuid
- *       - name: alunoId
+ *       - name: usuarioId
  *         in: path
  *         schema:
  *           type: string
@@ -233,11 +233,12 @@ router.post(
  *         description: Aluno removido da turma
  */
 router.delete(
-  "/:id/desenturmar/:alunoId",
+  "/:id/desenturmar/:usuarioId",
   authenticate,
   authorize("ADMIN", "COORDENADOR"),
   TurmaCtrl.desenturmarAluno
 );
+
 
 /**
  * @openapi

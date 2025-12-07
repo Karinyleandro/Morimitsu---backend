@@ -12,10 +12,7 @@ import alunoRoutes from "./src/routes/aluno_routes.js"
 import faixaRoutes from "./src/routes/faixa_routes.js";
 import relatorioRoutes from "./src/routes/relatorio_routes.js"
 import aniversariosRoutes from "./src/routes/aniversario_routes.js"
-
-//import graduacaoRoutes from "./src/routes/graduacao_routes.js";
-
-// import alunoRoutes from "./src/routes/aluno_routes.js";
+import graduacaoRoutes from "./src/routes/graduacao_routes.js";
 
 dotenv.config();
 
@@ -68,8 +65,7 @@ app.use("/alunos", alunoRoutes);
 app.use("/faixas", faixaRoutes);
 app.use("/relatorio", relatorioRoutes)
 app.use("/aniversariantes", aniversariosRoutes)
-//app.use("/graduacoes", graduacaoRoutes);
-// app.use("/alunos", alunoRoutes);
+app.use("/graduacao", graduacaoRoutes);
 
 app.get("/", (req, res) => {
   res.send(" API Morimitsu está rodando!");
