@@ -63,7 +63,7 @@ app.use("/turmas", turmaRoutes);
 app.use("/responsaveis", responsavelRoutes);
 app.use("/alunos", alunoRoutes);
 app.use("/faixas", faixaRoutes);
-app.use("/relatorio", relatorioRoutes)
+app.use("/relatorios", relatorioRoutes)
 app.use("/aniversariantes", aniversariosRoutes)
 app.use("/graduacao", graduacaoRoutes);
 

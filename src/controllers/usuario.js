@@ -90,22 +90,22 @@ export const obterUsuarioDetalhado = async (req, res) => {
 // ==================== ATUALIZAR PERFIL DO USUÁRIO ====================
 export const atualizarPerfil = async (req, res) => {
   try {
-    const usuarioId = req.params.id; // ID do usuário que será atualizado
-    const { id: logadoId, tipo: tipoLogado } = req.user; // usuário autenticado
+    const usuarioId = req.params.id;
+    const { id: logadoId, tipo: tipoLogado } = req.user;
     
-    // Apenas usuários autorizados
     const tiposPermitidos = ["PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR"];
     if (!tiposPermitidos.includes(tipoLogado)) {
       return res.status(403).json({ message: "Acesso negado" });
     }
 
-    // Só pode atualizar seu próprio perfil
     if (usuarioId !== logadoId) {
       return res.status(403).json({ message: "Você só pode atualizar seu próprio perfil" });
     }
 
     const {
       nome,
+      nome_social,
+      tipo,
       dataNascimento,
       cpf,
       genero,
@@ -113,37 +113,50 @@ export const atualizarPerfil = async (req, res) => {
       endereco,
       password,
       telefone,
-      imagem_perfil_url
+      imagem_perfil_url,
     } = req.body;
 
-    // Monta objeto de atualização dinamicamente
+    // ======= OBJETO DINÂMICO =======
     const dataToUpdate = {};
-    if (nome !== undefined) dataToUpdate.nome = nome;
-    if (dataNascimento !== undefined) dataToUpdate.dataNascimento = new Date(dataNascimento);
-    if (cpf !== undefined) dataToUpdate.cpf = cpf;
-    if (genero !== undefined) dataToUpdate.genero = genero;
-    if (email !== undefined) dataToUpdate.email = email;
-    if (endereco !== undefined) dataToUpdate.endereco = endereco;
-    if (telefone !== undefined) dataToUpdate.telefone = telefone;
-    if (imagem_perfil_url !== undefined) dataToUpdate.imagem_perfil_url = imagem_perfil_url;
+    const assign = (field, value) => {
+      if (value !== undefined) dataToUpdate[field] = value;
+    };
+
+    assign("nome", nome);
+    assign("nome_social", nome_social);
+    assign("tipo", tipo);
+    assign("cpf", cpf);
+    assign("genero", genero);
+    assign("email", email);
+    assign("endereco", endereco);
+    assign("telefone", telefone);
+    assign("imagem_perfil_url", imagem_perfil_url);
+
+    if (dataNascimento !== undefined) {
+      dataToUpdate.dataNascimento = new Date(dataNascimento);
+    }
+
     if (password !== undefined) {
       dataToUpdate.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     }
 
-    // Atualiza o usuário no banco
+    // ======= EXECUTA UPDATE =======
     const updatedUser = await prisma.usuario.update({
       where: { id: usuarioId },
       data: dataToUpdate,
       select: {
         id: true,
         nome: true,
+        nome_social: true,
+        tipo: true,
         dataNascimento: true,
         cpf: true,
         genero: true,
         email: true,
         endereco: true,
         telefone: true,
-        imagem_perfil_url: true
+        imagem_perfil_url: true,
+       
       }
     });
 
@@ -158,10 +171,12 @@ export const atualizarPerfil = async (req, res) => {
   }
 };
 
+
 // ==================== ATUALIZAR USUÁRIO ====================
 export const atualizarUsuario = async (req, res) => {
   try {
     const { id } = req.params;
+
     const {
       nome,
       nome_social,
@@ -171,11 +186,11 @@ export const atualizarUsuario = async (req, res) => {
       cpf,
       telefone,
       genero,
-      responsaveis = [],
+      responsaveis,
       id_faixa,
       grau,
       num_matricula,
-      turmaIds = [],
+      turmaIds,
       aulas,
       email,
       password,
@@ -185,72 +200,96 @@ export const atualizarUsuario = async (req, res) => {
 
     const tiposAlunos = ["ALUNO", "ALUNO_PROFESSOR"];
 
-    // Calcula idade
-    const idade = dataNascimento ? calcularIdade(dataNascimento) : null;
+    // Validação de idade (se enviar dataNascimento)
+    let idade = null;
+    if (dataNascimento) {
+      idade = calcularIdade(dataNascimento);
 
-    // Valida responsáveis para alunos menores de 18 anos
-    if (tiposAlunos.includes(tipo) && idade !== null && idade < 18) {
-      if (!responsaveis || responsaveis.length === 0) {
-        return res.status(400).json({
-          message: "Aluno menor de 18 anos precisa de pelo menos um responsável",
-        });
+      if (tiposAlunos.includes(tipo) && idade < 18) {
+        if (!responsaveis || responsaveis.length === 0) {
+          return res.status(400).json({
+            message: "Aluno menor de 18 anos precisa de pelo menos um responsável",
+          });
+        }
       }
     }
 
-    // Prepara dados de responsáveis
-    const responsaveisData =
-      responsaveis.length > 0
-        ? {
-            deleteMany: {}, // remove os anteriores
-            create: responsaveis.map((r) => ({
-              telefone: r.telefone,
-              nome: r.nome || null,
-              email: r.email || null,
-              grau_parentesco: "Responsável",
-            })),
-          }
-        : undefined;
-
-    // Prepara dados das turmas
-    const turmaData =
-      turmaIds.length > 0
-        ? {
-            deleteMany: {},
-            create: turmaIds.map((turmaId) => ({
-              turma: { connect: { id: turmaId } },
-              ativo: true,
-              frequencia_acumulada: 0,
-            })),
-          }
-        : undefined;
-
-    // Monta objeto data apenas com campos definidos
+    // ----------------------
+    // MONTA OBJETO DINÂMICO
+    // ----------------------
     const dataToUpdate = {};
 
-    if (nome !== undefined) dataToUpdate.nome = nome;
-    if (nome_social !== undefined) dataToUpdate.nome_social = nome_social;
-    if (tipo !== undefined) dataToUpdate.tipo = tipo;
-    if (endereco !== undefined) dataToUpdate.endereco = endereco;
-    if (dataNascimento !== undefined)
-      dataToUpdate.dataNascimento = new Date(dataNascimento);
-    if (cpf !== undefined) dataToUpdate.cpf = cpf;
-    if (telefone !== undefined) dataToUpdate.telefone = telefone;
-    if (genero !== undefined) dataToUpdate.genero = genero;
-    if (email !== undefined) dataToUpdate.email = email;
-    if (password !== undefined)
-      dataToUpdate.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    if (grau !== undefined) dataToUpdate.grau = grau;
-    if (num_matricula !== undefined) dataToUpdate.num_matricula = num_matricula;
-    if (aulas !== undefined) dataToUpdate.aulas = aulas;
-    if (ativo !== undefined) dataToUpdate.ativo = ativo;
-    if (imagem_perfil_url !== undefined)
-      dataToUpdate.imagem_perfil_url = imagem_perfil_url;
-    if (id_faixa !== undefined)
-      dataToUpdate.faixa = { connect: { id: id_faixa } };
-    if (responsaveisData !== undefined) dataToUpdate.responsaveis = responsaveisData;
-    if (turmaData !== undefined) dataToUpdate.turma_matriculas = turmaData;
+    const assignIfDefined = (field, value) => {
+      if (value !== undefined) dataToUpdate[field] = value;
+    };
 
-    // Atualiza usuário
+    assignIfDefined("nome", nome);
+    assignIfDefined("nome_social", nome_social);
+    assignIfDefined("tipo", tipo);
+    assignIfDefined("endereco", endereco);
+    assignIfDefined("cpf", cpf);
+    assignIfDefined("telefone", telefone);
+    assignIfDefined("genero", genero);
+    assignIfDefined("grau", grau);
+    assignIfDefined("num_matricula", num_matricula);
+    assignIfDefined("aulas", aulas);
+    assignIfDefined("email", email);
+    assignIfDefined("ativo", ativo);
+    assignIfDefined("imagem_perfil_url", imagem_perfil_url);
+
+    if (dataNascimento !== undefined) {
+      dataToUpdate.dataNascimento = new Date(dataNascimento);
+    }
+
+    if (password !== undefined) {
+      dataToUpdate.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    }
+
+    // -------------------------
+    // RELACIONAMENTO: FAIXA
+    // -------------------------
+    if (id_faixa !== undefined) {
+      dataToUpdate.faixa = { connect: { id: id_faixa } };
+    }
+
+    // --------------------------------------
+    // RELACIONAMENTO: RESPONSÁVEIS (OPCIONAL)
+    // --------------------------------------
+    if (responsaveis !== undefined) {
+      dataToUpdate.responsaveis =
+        responsaveis.length > 0
+          ? {
+              deleteMany: {},
+              create: responsaveis.map((r) => ({
+                telefone: r.telefone,
+                nome: r.nome || null,
+                email: r.email || null,
+                grau_parentesco: "Responsável",
+              })),
+            }
+          : { deleteMany: {} }; // zera se vier array vazio
+    }
+
+    // --------------------------------------
+    // RELACIONAMENTO: TURMAS (OPCIONAL)
+    // --------------------------------------
+    if (turmaIds !== undefined) {
+      dataToUpdate.turma_matriculas =
+        turmaIds.length > 0
+          ? {
+              deleteMany: {},
+              create: turmaIds.map((turmaId) => ({
+                turma: { connect: { id: turmaId } },
+                ativo: true,
+                frequencia_acumulada: 0,
+              })),
+            }
+          : { deleteMany: {} }; // zera se vier array vazio
+    }
+
+    // ----------------------
+    // EXECUTA UPDATE
+    // ----------------------
     const updatedUser = await prisma.usuario.update({
       where: { id },
       data: dataToUpdate,
@@ -266,11 +305,13 @@ export const atualizarUsuario = async (req, res) => {
       .json({ message: "Usuário atualizado com sucesso", user: updatedUser });
   } catch (error) {
     console.error("Erro ao atualizar usuário:", error);
-    return res
-      .status(500)
-      .json({ message: "Erro interno do servidor", error: error.message });
+    return res.status(500).json({
+      message: "Erro interno do servidor",
+      error: error.message,
+    });
   }
 };
+
 
 // ==================== DELETAR USUÁRIO ====================
 export const deletarUsuario = async (req, res) => {

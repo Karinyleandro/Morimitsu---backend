@@ -71,6 +71,36 @@ function calcularIdade(dataNascimento) {
   return idade;
 }
 
+function validarCPF(cpf) {
+  if (!cpf) return false;
+
+  cpf = cpf.replace(/[^\d]+/g, '');
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+  let soma = 0;
+  let resto;
+
+  for (let i = 1; i <= 9; i++) {
+    soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+  }
+
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.substring(9, 10))) return false;
+
+  soma = 0;
+  for (let i = 1; i <= 10; i++) {
+    soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+  }
+
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.substring(10, 11))) return false;
+
+  return true;
+}
+
 export const register = async (req, res) => {
   try {
     const {
@@ -94,17 +124,29 @@ export const register = async (req, res) => {
 
     const tiposAlunos = ["ALUNO", "ALUNO_PROFESSOR"];
 
+    // --- CPF ---
+    if (cpf) {
+      if (!validarCPF(cpf)) {
+        return res.status(400).json({ message: "CPF inválido" });
+      }
+
+      const cpfExiste = await prisma.usuario.findUnique({ where: { cpf } });
+      if (cpfExiste) {
+        return res.status(400).json({ message: "CPF já cadastrado" });
+      }
+    }
+
     // Calcula idade
     const idade = dataNascimento ? calcularIdade(dataNascimento) : null;
 
-    // Valida responsáveis para alunos menores de 18 anos
+    // Valida responsáveis para menores de 18 anos
     if (tiposAlunos.includes(tipo) && idade !== null && idade < 18) {
       if (!responsaveis || responsaveis.length === 0) {
         return res.status(400).json({ message: "Aluno menor de 18 anos precisa de pelo menos um responsável" });
       }
     }
 
-    // Prepara dados de responsáveis
+    // Prepara responsáveis
     const responsaveisData = responsaveis && responsaveis.length > 0
       ? { create: responsaveis.map(r => ({
           telefone: r.telefone,
@@ -114,7 +156,7 @@ export const register = async (req, res) => {
         })) }
       : undefined;
 
-    // Prepara dados das turmas
+    // Prepara turmas
     const turmaData = turmaIds && turmaIds.length > 0
       ? { create: turmaIds.map(id => ({
           turma: { connect: { id } },
@@ -134,8 +176,8 @@ export const register = async (req, res) => {
         cpf: cpf || null,
         telefone: telefone || null,
         genero: genero || null,
-        email: email || null, // email agora opcional
-        passwordHash: password ? await bcrypt.hash(password, SALT_ROUNDS) : null, // senha opcional
+        email: email || null,
+        passwordHash: password ? await bcrypt.hash(password, SALT_ROUNDS) : null,
         grau: grau || null,
         num_matricula: num_matricula || null,
         aulas: aulas || null,
@@ -157,7 +199,6 @@ export const register = async (req, res) => {
     res.status(500).json({ message: "Erro interno do servidor", error: error.message });
   }
 };
-
 
 
 

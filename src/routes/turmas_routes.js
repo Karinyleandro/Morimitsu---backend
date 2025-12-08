@@ -6,6 +6,38 @@ const router = express.Router();
 
 /**
  * @openapi
+ * /turmas/{id}/alunos:
+ *   get:
+ *     summary: Lista todos os alunos matriculados em uma turma
+ *     tags: [Turmas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID da turma
+ *     responses:
+ *       200:
+ *         description: Lista de alunos da turma
+ *       400:
+ *         description: Parâmetros inválidos
+ *       404:
+ *         description: Turma não encontrada
+ */
+router.get(
+  "/:id/alunos",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
+  TurmaCtrl.listarAlunosPorTurma
+);
+
+
+/**
+ * @openapi
  * /turmas:
  *   get:
  *     summary: Lista todas as turmas com filtros opcionais
@@ -246,8 +278,8 @@ router.delete(
  *   post:
  *     summary: Registra a frequência de uma aula para uma turma
  *     description: >
- *       Registra presenças e ausências dos alunos em uma data específica para a turma informada.
- *       O campo **id** no path deve ser o **UUID da turma**.
+ *       Registra presenças e ausências dos alunos para uma data e horário de aula específicos.
+ *       O campo **id** no path deve ser o identificador da turma (UUID).
  *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
@@ -255,10 +287,9 @@ router.delete(
  *       - name: id
  *         in: path
  *         required: true
- *         description: UUID da turma na qual a frequência será registrada.
+ *         description: ID da turma na qual a frequência será registrada.
  *         schema:
  *           type: string
- *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -267,6 +298,7 @@ router.delete(
  *             type: object
  *             required:
  *               - data
+ *               - horario
  *               - frequencias
  *             properties:
  *               data:
@@ -274,6 +306,11 @@ router.delete(
  *                 format: date
  *                 example: "2025-02-20"
  *                 description: Data da aula.
+ *               horario:
+ *                 type: string
+ *                 example: "19:30"
+ *                 description: |
+ *                   Horário da aula (formato livre, exemplos: "19:30" ou "19h30").
  *               frequencias:
  *                 type: array
  *                 description: Lista de alunos com seu status de presença.
@@ -285,8 +322,8 @@ router.delete(
  *                   properties:
  *                     alunoId:
  *                       type: string
- *                       format: uuid
  *                       example: "4cbb1e73-d8f4-4d8f-9c4a-14cc74af39b6"
+ *                       description: ID do aluno.
  *                     presente:
  *                       type: boolean
  *                       example: true
@@ -307,15 +344,13 @@ router.post(
   TurmaCtrl.registrarFrequencia
 );
 
-
 /**
  * @openapi
  * /turmas/frequencias:
  *   get:
  *     summary: Consulta registros de frequência de uma turma
  *     description: >
- *       Retorna os registros de frequência associados à turma informada.  
- *       Apenas **turmaId** é utilizado na implementação atual.
+ *       Retorna os registros de frequência associados à turma informada via query string.
  *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
@@ -323,23 +358,24 @@ router.post(
  *       - in: query
  *         name: turmaId
  *         required: true
- *         description: UUID da turma a ser consultada.
+ *         description: ID da turma que será consultada.
  *         schema:
  *           type: string
- *           format: uuid
  *       - in: query
  *         name: page
+ *         description: Número da página para paginação.
  *         schema:
  *           type: integer
  *           default: 1
  *       - in: query
  *         name: limit
+ *         description: Limite de registros por página.
  *         schema:
  *           type: integer
  *           default: 50
  *     responses:
  *       200:
- *         description: Registros de frequência encontrados.
+ *         description: Registros de frequência encontrados com sucesso.
  *       400:
  *         description: turmaId não informado.
  *       403:

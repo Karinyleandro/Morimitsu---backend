@@ -84,19 +84,19 @@ router.get("/:id", authenticate, obterUsuarioDetalhado);
  * @openapi
  * /usuarios/perfil/{id}:
  *   patch:
- *     summary: Atualizar o próprio perfil do usuário
+ *     summary: Atualiza o próprio perfil do usuário
  *     tags:
- *       - usuários
+ *       - Usuários
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
  *           format: uuid
- *         description: UUID do usuário logado
+ *         description: ID do usuário autenticado
  *     requestBody:
  *       required: true
  *       content:
@@ -107,8 +107,12 @@ router.get("/:id", authenticate, obterUsuarioDetalhado);
  *               nome:
  *                 type: string
  *                 example: "Renato José de Souza"
+ *               nome_social:
+ *                 type: string
+ *                 example: "Ranni"
  *               dataNascimento:
  *                 type: string
+ *                 format: date
  *                 example: "2008-12-07"
  *               cpf:
  *                 type: string
@@ -132,6 +136,10 @@ router.get("/:id", authenticate, obterUsuarioDetalhado);
  *               imagem_perfil_url:
  *                 type: string
  *                 example: "https://meusite.com/fotos/renato.jpg"
+ *               tipo:
+ *                 type: string
+ *                 enum: [ADMIN, COORDENADOR, PROFESSOR, ALUNO, ALUNO_PROFESSOR]
+ *                 example: "ALUNO"
  *     responses:
  *       200:
  *         description: Perfil atualizado com sucesso
@@ -142,6 +150,7 @@ router.patch(
   validateBody(atualizarPerfilSchema),
   atualizarPerfil
 );
+
 
 /* =====================================================
    PUT – ATUALIZAR USUÁRIO

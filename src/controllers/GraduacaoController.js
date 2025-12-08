@@ -1,279 +1,316 @@
-import prisma from "../prisma.js";
 
-// Helper de idade
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+
+
+/* ------------------------- FUNÇÕES AUXILIARES ------------------------- */
+
 function calcularIdade(dataNascimento) {
   if (!dataNascimento) return null;
   const hoje = new Date();
   const nasc = new Date(dataNascimento);
+
   let idade = hoje.getFullYear() - nasc.getFullYear();
   const m = hoje.getMonth() - nasc.getMonth();
+
   if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+
   return idade;
 }
 
-// Regras de transição
-const TRANSICOES_AULAS = {
-  "Branca->Azul": { adulto: 40, infantil: 30 },
-  "Azul->Roxa": 45,
-  "Roxa->Marrom": 50,
-  "Marrom->Preta": 60,
-  "DEFAULT": 30
-};
+async function obterProximaFaixaAtual(usuario) {
+  const faixaAtual = usuario.id_faixa
+    ? await prisma.faixa.findUnique({ where: { id: usuario.id_faixa } })
+    : await prisma.faixa.findFirst({ orderBy: { ordem: "asc" } });
 
-// Idades mínimas
-const IDADES_MINIMAS_POR_FAIXA = {
-  "Cinza": 4,
-  "Amarela": 7,
-  "Laranja": 10,
-  "Verde": 13,
-  "Azul": 16,
-  "Roxa": 16,
-  "Marrom": 18,
-  "Preta": 19
-};
+  if (!faixaAtual) return { faixaAtual: null, proximaFaixa: null };
 
-// NOVO: regras de faixa por idade
-function faixaPermitidaSistema(idade, ordemFaixa) {
-  if (idade < 16) return ordemFaixa <= 13;   // só infantil
-  return ordemFaixa >= 14;                  // só adulto
+  const proximaFaixa = await prisma.faixa.findFirst({
+    where: { ordem: { gt: faixaAtual.ordem } },
+    orderBy: { ordem: "asc" },
+  });
+
+  return { faixaAtual, proximaFaixa };
 }
 
-// Contar presenças desde data
-async function contarPresencasDesde(alunoId, dataBase = null) {
-  const where = { id_aluno: Number(alunoId), presente: true };
-  if (dataBase) where.data = { gte: dataBase };
-  return prisma.frequencia.count({ where });
+async function contarAulasPresente(alunoId) {
+  return prisma.frequencia.count({
+    where: { id_aluno: alunoId, presente: true },
+  });
 }
 
-export default {
+async function obterRequisitoParaProximoGrau(usuario) {
+  const nextGrau = (usuario.grau ?? 0) + 1;
 
-  // ---------------------------------------------
-  // RF-022 – IDENTIFICAR APTOS
-  // ---------------------------------------------
-  async identificarAptos(req, res) {
-    try {
-      const alunos = await prisma.aluno.findMany({ include: { usuario: true }});
-      const faixas = await prisma.faixa.findMany();
-      const resultados = [];
+  if (!usuario.id_faixa) return { requisito: null, nextGrau };
 
-      for (const aluno of alunos) {
-        const idade = calcularIdade(aluno.dataNascimento);
-        const infantil = idade !== null && idade < 16;
+  const requisito = await prisma.requisito_Grau.findFirst({
+    where: { faixa_id: usuario.id_faixa, grau: nextGrau },
+  });
 
-        const ultimaGrad = await prisma.graduacao.findFirst({
-          where: { alunoId: aluno.id },
-          orderBy: { data_graduacao: "desc" }
-        });
+  return { requisito, nextGrau };
+}
 
-        const faixaAtual = ultimaGrad
-          ? await prisma.faixa.findUnique({ where: { id: ultimaGrad.faixa_id }})
-          : faixas.find(f => f.nome.toLowerCase() === "branca");
+function aulasNecessarias(faixaNome, idade) {
+  const faixa = faixaNome?.toLowerCase() ?? "branca";
 
-        // 🔥 NOVO: filtrar apenas faixas permitidas pelo sistema correto (infantil/adulto)
-        const proxima = await prisma.faixa.findFirst({
-          where: {
-            ordem: faixaAtual.ordem + 1,
-            AND: infantil
-              ? { ordem: { lte: 13 } }
-              : { ordem: { gte: 14 } }
-          }
-        });
+  if (idade < 16) return 30; // infantil
 
-        if (!proxima) continue;
+  switch (faixa) {
+    case "branca": return 40;
+    case "azul": return 45;
+    case "roxa": return 50;
+    case "marrom": return 60;
+    default: return 30;
+  }
+}
 
-        let dataBase = aluno.ultima_reset_frequencia
-          ? new Date(aluno.ultima_reset_frequencia)
-          : ultimaGrad?.data_graduacao
-            ? new Date(ultimaGrad.data_graduacao)
-            : null;
+const padraoErro = (res, msg, status = 400) =>
+  res.status(status).json({ erro: msg });
 
-        const presencas = await contarPresencasDesde(aluno.id, dataBase);
+const padraoSucesso = (res, dados) => res.json(dados);
 
-        let aulasNecessarias = TRANSICOES_AULAS.DEFAULT;
-        const chave = `${faixaAtual.nome}->${proxima.nome}`;
+/* ------------------------------ CONTROLLER ------------------------------ */
 
-        if (chave === "Branca->Azul")
-          aulasNecessarias = infantil
-            ? TRANSICOES_AULAS["Branca->Azul"].infantil
-            : TRANSICOES_AULAS["Branca->Azul"].adulto;
-        else if (TRANSICOES_AULAS[chave])
-          aulasNecessarias = TRANSICOES_AULAS[chave];
+const GraduacaoController = {
 
-        resultados.push({
-          alunoId: aluno.id,
-          nome: aluno.nome,
-          faixaAtual: faixaAtual.nome,
-          proximaFaixa: proxima.nome,
-          idade,
-          presencas,
-          aulasNecessarias,
-          apto: presencas >= aulasNecessarias
-        });
+  /* ------------------------ LISTAR APTOS ------------------------ */
+async listarAptos(req, res) {
+  try {
+    const alunos = await prisma.usuario.findMany({
+      where: { tipo: { in: ["ALUNO", "ALUNO_PROFESSOR"] } },
+      include: {
+        faixa: true,
+        graduacoes: { orderBy: { data_graduacao: "desc" } },
+      },
+    });
+
+    const resultados = [];
+
+    for (const aluno of alunos) {
+      const idade = calcularIdade(aluno.dataNascimento);
+
+      // executa em sequência, evitando explosão de conexões
+      const aulasPresente = await contarAulasPresente(aluno.id);
+      const reqObj = await obterRequisitoParaProximoGrau(aluno);
+      const faixas = await obterProximaFaixaAtual(aluno);
+
+      const { requisito, nextGrau } = reqObj;
+      const { faixaAtual, proximaFaixa } = faixas;
+
+      const minimo =
+        requisito?.requisito_aulas ??
+        aulasNecessarias(aluno.faixa?.nome, idade);
+
+      let tempoOk = true;
+
+      if (requisito?.tempo_minimo_dias) {
+        const ultima = aluno.graduacoes?.[0];
+        if (ultima) {
+          const dias = Math.floor(
+            (Date.now() - new Date(ultima.data_graduacao)) /
+              (1000 * 60 * 60 * 24)
+          );
+          tempoOk = dias >= requisito.tempo_minimo_dias;
+        }
       }
 
-      return res.json(resultados);
-
-    } catch (err) {
-      console.error("Erro identificarAptos:", err);
-      return res.status(500).json({ message: "Erro interno" });
-    }
-  },
-
-
-  // ---------------------------------------------
-  // RF-023 – GRADUAR ALUNO
-  // ---------------------------------------------
-  async graduar(req, res) {
-    try {
-      const user = req.user;
-      if (!user || user.tipo !== "COORDENADOR")
-        return res.status(403).json({ message: "Apenas coordenador pode graduar" });
-
-      const { alunoId, faixa_id, grau, aprovado_mestre } = req.body;
-      if (!alunoId || !faixa_id || grau === undefined)
-        return res.status(400).json({ message: "Campos obrigatórios faltando" });
-
-      if (!aprovado_mestre)
-        return res.status(400).json({ message: "É obrigatório aprovado_mestre = true" });
-
-      const aluno = await prisma.aluno.findUnique({
-        where: { id: Number(alunoId) },
-        include: { usuario: true }
-      });
-
-      if (!aluno) return res.status(404).json({ message: "Aluno não encontrado" });
-
-      const ultimaGrad = await prisma.graduacao.findFirst({
-        where: { alunoId: aluno.id },
-        orderBy: { data_graduacao: "desc" }
-      });
-
-      const faixaAtual = ultimaGrad
-        ? await prisma.faixa.findUnique({ where: { id: ultimaGrad.faixa_id }})
-        : await prisma.faixa.findFirst({ where: { nome: "Branca" }});
-
-      const faixaDestino = await prisma.faixa.findUnique({
-        where: { id: Number(faixa_id) }
-      });
-
-      if (!faixaDestino)
-        return res.status(404).json({ message: "Faixa destino não encontrada" });
-
-      const idade = calcularIdade(aluno.dataNascimento);
-      const infantil = idade < 16;
-
-      // 🔥 REGRA NOVA: criança só recebe faixa até ordem 13
-      if (infantil && faixaDestino.ordem > 13)
-        return res.status(400).json({ message: "Aluno infantil só pode faixas cinza/amarela/laranja/verde" });
-
-      // 🔥 REGRA NOVA: adulto não pode pegar faixa infantil
-      if (!infantil && faixaDestino.ordem <= 13)
-        return res.status(400).json({ message: "Faixas infantis não são permitidas para alunos adultos" });
-
-      // 🔥 Impedir pular faixas
-      if (faixaDestino.ordem > faixaAtual.ordem + 1)
-        return res.status(400).json({ message: "Não pode pular faixas" });
-
-      // 🔥 Impedir rebaixar
-      if (faixaDestino.ordem < faixaAtual.ordem)
-        return res.status(400).json({ message: "Não pode rebaixar faixa" });
-
-      // Idade mínima oficial
-      const idadeMinima = IDADES_MINIMAS_POR_FAIXA[faixaDestino.nome];
-      if (idadeMinima && idade < idadeMinima)
-        return res.status(400).json({
-          message: `Idade mínima para faixa ${faixaDestino.nome} é ${idadeMinima}`
-        });
-
-      let dataBase = aluno.ultima_reset_frequencia
-        ? new Date(aluno.ultima_reset_frequencia)
-        : ultimaGrad?.data_graduacao
-          ? new Date(ultimaGrad.data_graduacao)
+      const faltam = Math.max(0, minimo - aulasPresente);
+      const status =
+        faltam === 0 && tempoOk
+          ? "PRONTO"
+          : faltam <= 5
+          ? "PROXIMO"
           : null;
 
-      const presencas = await contarPresencasDesde(aluno.id, dataBase);
+      if (!status) continue;
 
-      let aulasNecessarias = TRANSICOES_AULAS.DEFAULT;
-      const chave = `${faixaAtual.nome}->${faixaDestino.nome}`;
+      resultados.push({
+        alunoId: aluno.id,
+        nome: aluno.nome,
+        idade,
+        faixaAtual,
+        grauAtual: aluno.grau ?? 0,
+        proximoGrau: nextGrau,
+        proximaFaixa,
+        aulasPresente,
+        minimoAulas: minimo,
+        faltam,
+        tempoOk,
+        status,
+      });
+    }
 
-      if (chave === "Branca->Azul")
-        aulasNecessarias = infantil
-          ? TRANSICOES_AULAS["Branca->Azul"].infantil
-          : TRANSICOES_AULAS["Branca->Azul"].adulto;
-      else if (TRANSICOES_AULAS[chave])
-        aulasNecessarias = TRANSICOES_AULAS[chave];
+    return padraoSucesso(res, resultados);
+  } catch (err) {
+    console.error(err);
+    return padraoErro(res, "Erro ao listar aptos para graduação.", 500);
+  }
+},
 
-      if (presencas < aulasNecessarias)
-        return res.status(400).json({
-          message: `Presenças insuficientes: ${presencas}/${aulasNecessarias}`
-        });
 
-      const nova = await prisma.graduacao.create({
-        data: {
-          alunoId: aluno.id,
-          faixa_id: faixaDestino.id,
-          grau: Number(grau),
-          data_graduacao: new Date()
+  /* ------------------------ GRADUAR ALUNO ------------------------ */
+  async graduarAluno(req, res) {
+    try {
+      const coordenadorId = req.user.id;
+      const { alunoId } = req.params;
+      const { observacao } = req.body;
+
+      const aluno = await prisma.usuario.findUnique({
+        where: { id: alunoId },
+        include: {
+          faixa: true,
+          graduacoes: { orderBy: { data_graduacao: "desc" } },
         },
-        include: { faixa: true, aluno: true }
       });
 
-      // Quando aluno vira faixa roxa vira professor
-      if (faixaDestino.nome === "Roxa" && aluno.usuarioId) {
+      if (!aluno) return padraoErro(res, "Aluno não encontrado.", 404);
+
+      const idade = calcularIdade(aluno.dataNascimento);
+
+      const [aulasPresente, reqObj] = await Promise.all([
+        contarAulasPresente(aluno.id),
+        obterRequisitoParaProximoGrau(aluno),
+      ]);
+
+      const { requisito, nextGrau } = reqObj;
+
+      const minimo =
+        requisito?.requisito_aulas ??
+        aulasNecessarias(aluno.faixa?.nome, idade);
+
+      if (aulasPresente < minimo)
+        return padraoErro(res, "Aluno não possui aulas suficientes.");
+
+      // Interstício mínimo
+      if (requisito?.tempo_minimo_dias) {
+        const ultima = aluno.graduacoes?.[0];
+        if (ultima) {
+          const dias = Math.floor(
+            (Date.now() - new Date(ultima.data_graduacao)) /
+              (1000 * 60 * 60 * 24)
+          );
+          if (dias < requisito.tempo_minimo_dias)
+            return padraoErro(res, "Interstício mínimo não cumprido.");
+        }
+      }
+
+      /* --------- NOVO GRAU / FAIXA -------- */
+      const GRAU_MAX = 4;
+
+      let novoGrau = nextGrau;
+      let novaFaixaId = aluno.id_faixa;
+
+      if (novoGrau > GRAU_MAX) {
+        const proxima = await prisma.faixa.findFirst({
+          where: { ordem: { gt: aluno.faixa?.ordem ?? 0 } },
+          orderBy: { ordem: "asc" },
+        });
+
+        if (proxima) {
+          novaFaixaId = proxima.id;
+          novoGrau = 0;
+        } else {
+          novoGrau = GRAU_MAX;
+        }
+      }
+
+      const usuarioAtualizado = await prisma.usuario.update({
+        where: { id: aluno.id },
+        data: { id_faixa: novaFaixaId, grau: novoGrau },
+      });
+
+      const registroGraduacao = await prisma.graduacao.create({
+        data: {
+          alunoId: aluno.id,
+          faixa_id: novaFaixaId,
+          grau: novoGrau,
+          data_graduacao: new Date(),
+          observacao: observacao ?? null,
+        },
+      });
+
+      const faixaNova = await prisma.faixa.findUnique({
+        where: { id: novaFaixaId },
+      });
+
+      // Upgrade para ALUNO_PROFESSOR
+      if (
+        faixaNova?.nome.toLowerCase().includes("roxa") &&
+        usuarioAtualizado.tipo === "ALUNO"
+      ) {
         await prisma.usuario.update({
-          where: { id: aluno.usuarioId },
-          data: { tipo: "ALUNO,PROFESSOR" }
+          where: { id: aluno.id },
+          data: { tipo: "ALUNO_PROFESSOR" },
         });
       }
 
-      return res.status(201).json({
-        message: "Aluno graduado com sucesso",
-        graduacao: nova
+      // LOG
+      await prisma.log_Acao.create({
+        data: {
+          usuario_id: coordenadorId,
+          acao: "GRADUACAO",
+          descricao: `Graduou usuário ${aluno.id} — ${faixaNova?.nome}, grau ${novoGrau}`,
+        },
       });
 
+      return padraoSucesso(res, {
+        mensagem: "Graduação concluída.",
+        graduacao: registroGraduacao,
+      });
     } catch (err) {
-      console.error("Erro graduar:", err);
-      return res.status(500).json({ message: "Erro interno" });
+      console.error(err);
+      return padraoErro(res, "Erro ao graduar aluno.", 500);
     }
   },
 
-
-  // ---------------------------------------------
-  // HISTÓRICO
-  // ---------------------------------------------
+  /* ---------------------- HISTÓRICO ---------------------- */
   async listarHistorico(req, res) {
     try {
-      const alunoId = Number(req.params.alunoId);
+      const { alunoId } = req.params;
+
       const historico = await prisma.graduacao.findMany({
         where: { alunoId },
-        include: { faixa: true, aluno: true },
-        orderBy: { data_graduacao: "desc" }
+        orderBy: { data_graduacao: "desc" },
+        include: { faixa: true },
       });
-      return res.json(historico);
+
+      return padraoSucesso(res, historico);
     } catch (err) {
-      console.error("Erro listarHistorico:", err);
-      return res.status(500).json({ message: "Erro interno" });
+      console.error(err);
+      return padraoErro(res, "Erro ao listar histórico de graduações.", 500);
     }
   },
 
-
-  // ---------------------------------------------
-  // CONSULTAR ATUAL
-  // ---------------------------------------------
-  async obterAtual(req, res) {
+  /* ---------------------- GRADUAÇÃO ATUAL ---------------------- */
+  async graduacaoAtual(req, res) {
     try {
-      const alunoId = Number(req.params.alunoId);
-      const ultima = await prisma.graduacao.findFirst({
-        where: { alunoId },
+      const { alunoId } = req.params;
+
+      const usuario = await prisma.usuario.findUnique({
+        where: { id: alunoId },
         include: { faixa: true },
-        orderBy: { data_graduacao: "desc" }
       });
-      if (!ultima)
-        return res.status(404).json({ message: "Nenhuma graduacao encontrada" });
-      return res.json(ultima);
+
+      if (!usuario)
+        return padraoErro(res, "Usuário não encontrado.", 404);
+
+      return padraoSucesso(res, {
+        faixa: usuario.faixa
+          ? {
+              id: usuario.faixa.id,
+              nome: usuario.faixa.nome,
+              ordem: usuario.faixa.ordem,
+            }
+          : null,
+        grau: usuario.grau ?? 0,
+        tipo: usuario.tipo,
+      });
     } catch (err) {
-      console.error("Erro obterAtual:", err);
-      return res.status(500).json({ message: "Erro interno" });
+      console.error(err);
+      return padraoErro(res, "Erro ao consultar graduação atual.", 500);
     }
-  }
+  },
 };
+
+export default GraduacaoController;

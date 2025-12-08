@@ -155,6 +155,7 @@ model Frequencia {
   id_aluno       String
   id_registrador String
   data_aula      DateTime
+  horario_aula   String          
   presente       Boolean
   criado_em      DateTime @default(now())
 
@@ -162,6 +163,7 @@ model Frequencia {
   turma          Turma   @relation(fields: [id_turma], references: [id], onDelete: Cascade)
   aluno          Usuario @relation("UsuarioFrequencias", fields: [id_aluno], references: [id], onDelete: Cascade)
 }
+
 
 model Graduacao {
   id             String   @id @default(uuid())

@@ -1,136 +1,156 @@
 import { Router } from "express";
 import GraduacaoController from "../controllers/GraduacaoController.js";
+import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 
 const router = Router();
+
+/* -------------------------------------------------------------------------- */
+/*                                   SWAGGER                                  */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
  * tags:
  *   name: Graduações
- *   description: Endpoints relacionados ao sistema de graduação dos alunos
+ *   description: Endpoints do sistema de graduação dos alunos.
  */
+
+/* -------------------------------------------------------------------------- */
+/*                               LISTAR APTOS                                 */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
  * /graduacao/aptos:
  *   get:
- *     summary: Identificar alunos aptos à graduação
+ *     summary: Identifica alunos aptos ou próximos à graduação
  *     tags: [Graduações]
- *     description: >
- *       Retorna todos os alunos com:
- *       - idade calculada
- *       - faixa atual
- *       - próxima faixa
- *       - presenças acumuladas
- *       - se estão aptos ou não à graduação
  *     responses:
  *       200:
- *         description: Lista de alunos aptos e não aptos retornada com sucesso.
+ *         description: Lista de alunos com status PRONTO ou PROXIMO
+ *       403:
+ *         description: Acesso não autorizado
  *       500:
- *         description: Erro interno no servidor.
+ *         description: Erro interno
  */
-router.get("/aptos", GraduacaoController.identificarAptos);
+router.get(
+  "/aptos",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
+  GraduacaoController.listarAptos
+);
+
+/* -------------------------------------------------------------------------- */
+/*                                GRADUAR ALUNO                               */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
- * /graduacao:
+ * /graduacao/{alunoId}:
  *   post:
- *     summary: Graduar um aluno
+ *     summary: Realiza a graduação de um aluno
  *     tags: [Graduações]
- *     description: >
- *       Apenas coordenadores podem realizar uma graduação.
- *       O sistema valida automaticamente:
- *       - idade mínima necessária para a faixa
- *       - presenças acumuladas
- *       - proibição de pular faixas
- *       - aprovação obrigatória do mestre
+ *     parameters:
+ *       - in: path
+ *         name: alunoId
+ *         required: true
+ *         description: UUID do aluno
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *           example: "9e5261f6-5bbd-4d34-94fa-0b1faed31c91"
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - alunoId
- *               - faixa_id
- *               - grau
- *               - aprovado_mestre
  *             properties:
- *               alunoId:
- *                 type: number
- *                 example: 12
- *               faixa_id:
- *                 type: number
- *                 example: 3
- *               grau:
- *                 type: number
- *                 example: 0
- *               aprovado_mestre:
- *                 type: boolean
- *                 example: true
+ *               observacao:
+ *                 type: string
  *     responses:
- *       201:
- *         description: Aluno graduado com sucesso.
+ *       200:
+ *         description: Aluno graduado com sucesso
  *       400:
- *         description: >
- *           Regras não atendidas. Exemplos:
- *           - Idade mínima não alcançada
- *           - Presenças insuficientes
- *           - Tentativa de pular faixas
- *           - Faltam campos obrigatórios
+ *         description: Regras não atendidas (aulas, tempo mínimo, etc.)
  *       403:
- *         description: Apenas coordenadores podem graduar alunos.
+ *         description: Apenas coordenadores podem graduar alunos
  *       404:
- *         description: Aluno ou faixa não encontrada.
+ *         description: Aluno não encontrado
  *       500:
- *         description: Erro interno no servidor.
+ *         description: Erro interno
  */
-router.post("/", GraduacaoController.graduar);
+router.post(
+  "/:alunoId",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR"),
+  GraduacaoController.graduarAluno
+);
+
+/* -------------------------------------------------------------------------- */
+/*                                   HISTÓRICO                                */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
  * /graduacao/historico/{alunoId}:
  *   get:
- *     summary: Listar histórico de graduações de um aluno
+ *     summary: Lista histórico de graduações do aluno
  *     tags: [Graduações]
  *     parameters:
  *       - in: path
  *         name: alunoId
  *         required: true
- *         description: ID do aluno
  *         schema:
- *           type: number
+ *           type: string
+ *           format: uuid
+ *           example: "9e5261f6-5bbd-4d34-94fa-0b1faed31c91"
  *     responses:
  *       200:
- *         description: Histórico retornado com sucesso.
+ *         description: Histórico encontrado
  *       404:
- *         description: Nenhum histórico encontrado para este aluno.
+ *         description: Não encontrado
  *       500:
- *         description: Erro interno no servidor.
+ *         description: Erro interno
  */
-router.get("/historico/:alunoId", GraduacaoController.listarHistorico);
+router.get(
+  "/historico/:alunoId",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
+  GraduacaoController.listarHistorico
+);
+
+/* -------------------------------------------------------------------------- */
+/*                                GRADUAÇÃO ATUAL                             */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
  * /graduacao/atual/{alunoId}:
  *   get:
- *     summary: Obter a graduação atual do aluno
+ *     summary: Retorna graduação atual do aluno
  *     tags: [Graduações]
  *     parameters:
  *       - in: path
  *         name: alunoId
  *         required: true
- *         description: ID do aluno
  *         schema:
- *           type: number
+ *           type: string
+ *           format: uuid
+ *           example: "9e5261f6-5bbd-4d34-94fa-0b1faed31c91"
  *     responses:
  *       200:
- *         description: Faixa atual encontrada e retornada.
+ *         description: Dados retornados
  *       404:
- *         description: Nenhuma graduação encontrada para este aluno.
+ *         description: Usuário não encontrado
  *       500:
- *         description: Erro interno no servidor.
+ *         description: Erro interno
  */
-router.get("/atual/:alunoId", GraduacaoController.obterAtual);
+router.get(
+  "/atual/:alunoId",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
+  GraduacaoController.graduacaoAtual
+);
 
 export default router;
