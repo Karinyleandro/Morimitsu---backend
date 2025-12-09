@@ -149,6 +149,15 @@ export const usuariosParaFiltro = async (req, res) => {
   }
 };
 
+function normalizarNomeTurma(texto) {
+  return texto
+    .normalize("NFD")                 // separa acentos
+    .replace(/[\u0300-\u036f]/g, "")  // remove acentos
+    .toLowerCase()                    // caixa baixa
+    .replace(/\s+/g, " ")             // remove espaços duplicados
+    .trim();                          // remove espaços nas pontas
+}
+
 export const criarTurma = async (req, res) => {
   try {
     if (!["COORDENADOR", "ADMIN"].includes(req.user.tipo))
@@ -165,11 +174,16 @@ export const criarTurma = async (req, res) => {
     if (!nome || !responsavelId || faixaEtariaMin == null || faixaEtariaMax == null)
       return padraoRespostaErro(res, "Campos obrigatórios faltando", 400);
 
-    const nomeDuplicado = await prisma.turma.findFirst({
-      where: { nome_turma: nome }
-    });
+    // 🔥 Normaliza o nome recebido
+    const nomeNormalizado = normalizarNomeTurma(nome);
 
-    if (nomeDuplicado) {
+    // 🔥 Verifica duplicata normalizando todos do banco também
+    const turmas = await prisma.turma.findMany();
+    const existeDuplicada = turmas.some(t =>
+      normalizarNomeTurma(t.nome_turma) === nomeNormalizado
+    );
+
+    if (existeDuplicada) {
       return padraoRespostaErro(res, "Já existe uma turma com esse nome", 400);
     }
 
@@ -185,7 +199,7 @@ export const criarTurma = async (req, res) => {
 
     const turma = await prisma.turma.create({
       data: {
-        nome_turma: nome,
+        nome_turma: nome.trim(),
         faixa_etaria_min: Number(faixaEtariaMin),
         faixa_etaria_max: Number(faixaEtariaMax),
         data_criacao: new Date(),
@@ -213,6 +227,7 @@ export const criarTurma = async (req, res) => {
     return padraoRespostaErro(res, "Erro ao criar turma", 500);
   }
 };
+
 
 export const editarTurma = async (req, res) => {
   try {
