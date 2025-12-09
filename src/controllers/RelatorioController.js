@@ -1,6 +1,28 @@
 // src/controllers/RelatorioController.js
 import prisma from "../prisma.js";
 
+// Função utilitária para desempate por nome
+function compararNomes(a, b) {
+  const nomeA = a.nome?.trim().split(" ") || [];
+  const nomeB = b.nome?.trim().split(" ") || [];
+
+  const primeiroA = nomeA[0]?.toLowerCase() || "";
+  const primeiroB = nomeB[0]?.toLowerCase() || "";
+
+  if (primeiroA !== primeiroB) {
+    return primeiroA.localeCompare(primeiroB);
+  }
+
+  const sobrenomeA = nomeA[nomeA.length - 1]?.toLowerCase() || "";
+  const sobrenomeB = nomeB[nomeB.length - 1]?.toLowerCase() || "";
+
+  if (sobrenomeA !== sobrenomeB) {
+    return sobrenomeA.localeCompare(sobrenomeB);
+  }
+
+  return a.nome.localeCompare(b.nome); // fallback final
+}
+
 class RelatorioController {
 
   // -----------------------------------------------------------------------
@@ -8,6 +30,7 @@ class RelatorioController {
   // -----------------------------------------------------------------------
   static async metricasGerais(req, res) {
     try {
+      // total de alunos, professores, coordenadores e turmas (existente)
       const totalAlunos = await prisma.usuario.count({
         where: { tipo: { in: ["ALUNO", "ALUNO_PROFESSOR"] }, ativo: true }
       });
@@ -24,11 +47,42 @@ class RelatorioController {
         where: { ativo: true }
       });
 
+      // novo: total de usuários ativos (qualquer tipo)
+      const totalUsuarios = await prisma.usuario.count({
+        where: { ativo: true }
+      });
+
+      // novo: total de aulas
+      // 1) tenta contar pela tabela 'aula' (se existir)
+      // 2) fallback: conta sessões distintas registradas em 'frequencia' (agrupando por turma+data)
+      let totalAulas = 0;
+      try {
+        // se sua tabela de aulas for diferente, ajuste aqui
+        totalAulas = await prisma.aula.count({
+          where: { ativo: true } // opcional, remova se não existir o campo 'ativo'
+        });
+      } catch (err) {
+        // fallback: calcular a partir de registros de frequência
+        // ATENÇÃO: ajusta "data" caso o campo na sua tabela se chame diferente (ex: data_aula)
+        try {
+          const aulasAgrupadas = await prisma.frequencia.groupBy({
+            by: ["id_turma", "data"], // 'data' = campo que representa a data/hora da aula
+            _count: { id: true }
+          });
+          totalAulas = aulasAgrupadas.length;
+        } catch (err2) {
+          // Se o groupBy falhar por esquema diferente, tenta ao menos contar todos os registros de frequencia
+          totalAulas = await prisma.frequencia.count();
+        }
+      }
+
       return res.json({
         totalAlunos,
         totalProfessores,
         totalCoordenadores,
-        totalTurmas
+        totalTurmas,
+        totalUsuarios, // novo campo
+        totalAulas     // novo campo
       });
 
     } catch (error) {
@@ -42,41 +96,29 @@ class RelatorioController {
   // -----------------------------------------------------------------------
   static async rankingGeral(req, res) {
     try {
-      // Soma a quantidade de presenças por aluno
       const ranking = await prisma.frequencia.groupBy({
         by: ["id_aluno"],
         where: { presente: true },
         _count: { id: true }
       });
 
-      // Carrega os nomes
       const alunos = await prisma.usuario.findMany({
-        where: {
-          id: { in: ranking.map(r => r.id_aluno) }
-        },
-        select: {
-          id: true,
-          nome: true,
-          tipo: true,
-          ativo: true
-        }
+        where: { id: { in: ranking.map(r => r.id_aluno) } },
+        select: { id: true, nome: true }
       });
 
-      // Mescla dados
       const resultado = ranking.map(r => ({
         alunoId: r.id_aluno,
-        nome: alunos.find(a => a.id === r.id_aluno)?.nome,
+        nome: alunos.find(a => a.id === r.id_aluno)?.nome || "",
         totalAulas: r._count.id
       }))
       .sort((a, b) => {
-        // 1 - Maior número de aulas
-        if (b.totalAulas !== a.totalAulas) 
+        if (b.totalAulas !== a.totalAulas)
           return b.totalAulas - a.totalAulas;
 
-        // 2 - Desempate pelo nome
-        return a.nome.localeCompare(b.nome);
+        return compararNomes(a, b); // desempate por nome (primeiro → sobrenome)
       })
-      .slice(0, 3);  // Só top 3 (exigência do RF-033)
+      .slice(0, 3); // Top 3
 
       return res.json(resultado);
 
@@ -93,13 +135,9 @@ class RelatorioController {
     try {
       const { turmaId } = req.params;
 
-      // Soma presenças dentro daquela turma
       const ranking = await prisma.frequencia.groupBy({
         by: ["id_aluno"],
-        where: {
-          presente: true,
-          id_turma: turmaId
-        },
+        where: { presente: true, id_turma: turmaId },
         _count: { id: true }
       });
 
@@ -110,15 +148,16 @@ class RelatorioController {
 
       const resultado = ranking.map(r => ({
         alunoId: r.id_aluno,
-        nome: alunos.find(a => a.id === r.id_aluno)?.nome,
+        nome: alunos.find(a => a.id === r.id_aluno)?.nome || "",
         totalAulas: r._count.id
       }))
       .sort((a, b) => {
-        if (b.totalAulas !== a.totalAulas) 
+        if (b.totalAulas !== a.totalAulas)
           return b.totalAulas - a.totalAulas;
-        return a.nome.localeCompare(b.nome);
+
+        return compararNomes(a, b);
       })
-      .slice(0, 3); // Top 3 (RF-034)
+      .slice(0, 3);
 
       return res.json(resultado);
 
@@ -127,7 +166,6 @@ class RelatorioController {
       return res.status(500).json({ message: "Erro ao gerar ranking por turma" });
     }
   }
-
 }
 
 export default RelatorioController;

@@ -81,7 +81,7 @@ model Responsavel {
 
 model Faixa {
   id               String   @id @default(uuid())
-  nome             String
+  corFaixa             String
   ordem            Int @unique
   imagem_faixa_url String?
 

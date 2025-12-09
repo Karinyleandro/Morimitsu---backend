@@ -1,28 +1,28 @@
 [
-  { "nome": "Branca", "ordem": 1, "imagem_faixa_url": "images/faixas/branca.png" },
+  { "corFaixa": "Branca", "ordem": 1, "imagem_faixa_url": "images/faixas/branca.png" },
 
-  { "nome": "Cinza / Branca", "ordem": 2, "imagem_faixa_url": "images/faixas/cinza-branca.png" },
-  { "nome": "Cinza", "ordem": 3, "imagem_faixa_url": "images/faixas/cinza.png" },
-  { "nome": "Cinza / Preta", "ordem": 4, "imagem_faixa_url": "images/faixas/cinza-preta.png" },
+  { "corFaixa": "Cinza / Branca", "ordem": 2, "imagem_faixa_url": "images/faixas/cinza-branca.png" },
+  { "corFaixa": "Cinza", "ordem": 3, "imagem_faixa_url": "images/faixas/cinza.png" },
+  { "corFaixa": "Cinza / Preta", "ordem": 4, "imagem_faixa_url": "images/faixas/cinza-preta.png" },
 
-  { "nome": "Amarela / Branca", "ordem": 5, "imagem_faixa_url": "images/faixas/amarela-branca.png" },
-  { "nome": "Amarela", "ordem": 6, "imagem_faixa_url": "images/faixas/amarela.png" },
-  { "nome": "Amarela / Preta", "ordem": 7, "imagem_faixa_url": "images/faixas/amarela-preta.png" },
+  { "corFaixa": "Amarela / Branca", "ordem": 5, "imagem_faixa_url": "images/faixas/amarela-branca.png" },
+  { "corFaixa": "Amarela", "ordem": 6, "imagem_faixa_url": "images/faixas/amarela.png" },
+  { "corFaixa": "Amarela / Preta", "ordem": 7, "imagem_faixa_url": "images/faixas/amarela-preta.png" },
 
-  { "nome": "Laranja / Branca", "ordem": 8, "imagem_faixa_url": "images/faixas/laranja-branca.png" },
-  { "nome": "Laranja", "ordem": 9, "imagem_faixa_url": "images/faixas/laranja.png" },
-  { "nome": "Laranja / Preta", "ordem": 10, "imagem_faixa_url": "images/faixas/laranja-preta.png" },
+  { "corFaixa": "Laranja / Branca", "ordem": 8, "imagem_faixa_url": "images/faixas/laranja-branca.png" },
+  { "corFaixa": "Laranja", "ordem": 9, "imagem_faixa_url": "images/faixas/laranja.png" },
+  { "corFaixa": "Laranja / Preta", "ordem": 10, "imagem_faixa_url": "images/faixas/laranja-preta.png" },
 
-  { "nome": "Verde / Branca", "ordem": 11, "imagem_faixa_url": "images/faixas/verde-branca.png" },
-  { "nome": "Verde", "ordem": 12, "imagem_faixa_url": "images/faixas/verde.png" },
-  { "nome": "Verde / Preta", "ordem": 13, "imagem_faixa_url": "images/faixas/verde-preta.png" },
+  { "corFaixa": "Verde / Branca", "ordem": 11, "imagem_faixa_url": "images/faixas/verde-branca.png" },
+  { "corFaixa": "Verde", "ordem": 12, "imagem_faixa_url": "images/faixas/verde.png" },
+  { "corFaixa": "Verde / Preta", "ordem": 13, "imagem_faixa_url": "images/faixas/verde-preta.png" },
 
-  { "nome": "Azul", "ordem": 14, "imagem_faixa_url": "images/faixas/azul.png" },
-  { "nome": "Roxa", "ordem": 15, "imagem_faixa_url": "images/faixas/roxa.png" },
-  { "nome": "Marrom", "ordem": 16, "imagem_faixa_url": "images/faixas/marrom.png" },
-  { "nome": "Preta", "ordem": 17, "imagem_faixa_url": "images/faixas/preta.png" },
+  { "corFaixa": "Azul", "ordem": 14, "imagem_faixa_url": "images/faixas/azul.png" },
+  { "corFaixa": "Roxa", "ordem": 15, "imagem_faixa_url": "images/faixas/roxa.png" },
+  { "corFaixa": "Marrom", "ordem": 16, "imagem_faixa_url": "images/faixas/marrom.png" },
+  { "corFaixa": "Preta", "ordem": 17, "imagem_faixa_url": "images/faixas/preta.png" },
 
-  { "nome": "Vermelha / Preta", "ordem": 18, "imagem_faixa_url": "images/faixas/vermelha-preta.png" },
-  { "nome": "Vermelha / Branca", "ordem": 19, "imagem_faixa_url": "images/faixas/vermelha-branca.png" },
-  { "nome": "Vermelha", "ordem": 20, "imagem_faixa_url": "images/faixas/vermelha.png" }
+  { "corFaixa": "Vermelha / Preta", "ordem": 18, "imagem_faixa_url": "images/faixas/vermelha-preta.png" },
+  { "corFaixa": "Vermelha / Branca", "ordem": 19, "imagem_faixa_url": "images/faixas/vermelha-branca.png" },
+  { "corFaixa": "Vermelha", "ordem": 20, "imagem_faixa_url": "images/faixas/vermelha.png" }
 ]

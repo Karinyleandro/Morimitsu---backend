@@ -277,19 +277,23 @@ router.delete(
  * /turmas/{id}/frequencia:
  *   post:
  *     summary: Registra a frequência de uma aula para uma turma
- *     description: >
- *       Registra presenças e ausências dos alunos para uma data e horário de aula específicos.
- *       O campo **id** no path deve ser o identificador da turma (UUID).
  *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
+ *     description: >
+ *       Registra presenças e ausências dos alunos para uma data e horário
+ *       específicos. Apenas ADMIN, COORDENADOR, PROFESSOR e ALUNO_PROFESSOR
+ *       estão autorizados. Professores só podem registrar frequência das suas
+ *       próprias turmas.
+ *
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: ID da turma na qual a frequência será registrada.
+ *         description: ID da turma (UUID).
  *         schema:
  *           type: string
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -306,14 +310,15 @@ router.delete(
  *                 format: date
  *                 example: "2025-02-20"
  *                 description: Data da aula.
+ *
  *               horario:
  *                 type: string
  *                 example: "19:30"
- *                 description: |
- *                   Horário da aula (formato livre, exemplos: "19:30" ou "19h30").
+ *                 description: Horário da aula (formato flexível).
+ *
  *               frequencias:
  *                 type: array
- *                 description: Lista de alunos com seu status de presença.
+ *                 description: Lista de alunos com suas presenças.
  *                 items:
  *                   type: object
  *                   required:
@@ -322,20 +327,24 @@ router.delete(
  *                   properties:
  *                     alunoId:
  *                       type: string
+ *                       description: ID do aluno (UUID).
  *                       example: "4cbb1e73-d8f4-4d8f-9c4a-14cc74af39b6"
- *                       description: ID do aluno.
  *                     presente:
  *                       type: boolean
+ *                       description: Se o aluno esteve presente.
  *                       example: true
+ *
  *     responses:
  *       201:
  *         description: Frequência registrada com sucesso.
  *       400:
  *         description: Payload inválido.
  *       403:
- *         description: Sem permissão ou não autorizado para a turma.
+ *         description: Sem permissão ou tentativa de registrar frequência em turma não autorizada.
  *       404:
- *         description: Turma não encontrada.
+ *         description: Turma ou aluno não encontrado.
+ *       500:
+ *         description: Erro interno do servidor.
  */
 router.post(
   "/:id/frequencia",
@@ -344,13 +353,54 @@ router.post(
   TurmaCtrl.registrarFrequencia
 );
 
+
+/**
+ * @openapi
+ * /turmas/frequencia/{turmaId}:
+ *   get:
+ *     summary: Retorna o ranking de frequência dos alunos da turma
+ *     tags: [ranking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: turmaId
+ *         required: true
+ *         description: ID da turma
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Ranking gerado com sucesso
+ */
+router.get(
+  "/frequencia/:turmaId",
+  authenticate,
+  async (req, res) => {
+    try {
+      const modulo = await import("../controllers/TurmaController.js");
+
+      if (!modulo.rankingFrequencia) {
+        console.error("rankingFrequencia não encontrado no controller!");
+        return res.status(500).json({ erro: "Função rankingFrequencia ausente" });
+      }
+
+      return modulo.rankingFrequencia(req, res);
+
+    } catch (err) {
+      console.error("Erro ao carregar rankingFrequencia:", err);
+      return res.status(500).json({ erro: "Erro interno ao carregar módulo" });
+    }
+  }
+);
+
+
+
 /**
  * @openapi
  * /turmas/frequencias:
  *   get:
- *     summary: Consulta registros de frequência de uma turma
- *     description: >
- *       Retorna os registros de frequência associados à turma informada via query string.
+ *     summary: Consulta registros de frequência da turma
  *     tags: [Frequência]
  *     security:
  *       - bearerAuth: []
@@ -358,30 +408,21 @@ router.post(
  *       - in: query
  *         name: turmaId
  *         required: true
- *         description: ID da turma que será consultada.
  *         schema:
  *           type: string
  *       - in: query
  *         name: page
- *         description: Número da página para paginação.
  *         schema:
  *           type: integer
  *           default: 1
  *       - in: query
  *         name: limit
- *         description: Limite de registros por página.
  *         schema:
  *           type: integer
  *           default: 50
  *     responses:
  *       200:
- *         description: Registros de frequência encontrados com sucesso.
- *       400:
- *         description: turmaId não informado.
- *       403:
- *         description: Sem permissão para acessar os dados da turma.
- *       404:
- *         description: Turma não encontrada.
+ *         description: Registros retornados com sucesso.
  */
 router.get(
   "/frequencias",
@@ -389,5 +430,4 @@ router.get(
   authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
   TurmaCtrl.consultarFrequencias
 );
-
 export default router;

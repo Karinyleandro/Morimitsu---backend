@@ -7,12 +7,63 @@ import {
   atualizarUsuario,
   deletarUsuario,
   atualizarFotoUsuario,
-  atualizarPerfil
+  atualizarPerfil,
+  listarCoordenadoresProfessores
 
 } from "../controllers/usuario.js";
 import { atualizarUsuarioSchema, atualizarFotoSchema,  atualizarPerfilSchema } from "../validations/usuario.validators.js";
 
 const router = express.Router();
+
+/* =====================================================
+   GET – LISTAR PROFESSORES E COORDENADORES
+===================================================== */
+/**
+ * @openapi
+ * /usuarios/cargos/docentes:
+ *   get:
+ *     summary: Lista usuários com cargo de Professor ou Coordenador (com filtro opcional por tipo)
+ *     tags:
+ *       - usuários
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: nome
+ *         schema:
+ *           type: string
+ *         description: Filtrar por nome
+ *       - in: query
+ *         name: tipo
+ *         schema:
+ *           type: string
+ *           enum: [PROFESSOR, COORDENADOR]
+ *         description: Filtrar pelo cargo (PROFESSOR ou COORDENADOR)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Lista retornada com sucesso
+ */
+
+router.get(
+  "/cargos/docentes",
+  authenticate,
+  async (req, res) => {
+    const { listarCoordenadoresProfessores } = await import("../controllers/usuario.js");
+    return listarCoordenadoresProfessores(req, res);
+  }
+);
+
+
 
 /* =====================================================
    GET – LISTAR USUÁRIOS

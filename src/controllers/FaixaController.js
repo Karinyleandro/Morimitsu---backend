@@ -11,10 +11,10 @@ export const criarFaixa = async (req, res) => {
   try {
     requireRole(req.user, ["ADMIN", "COORDENADOR"]);
 
-    const { nome, ordem, imagem_faixa_url } = req.body;
+    const { corFaixa, ordem, imagem_faixa_url } = req.body;
 
-    if (!nome || ordem === undefined)
-      return res.status(400).json({ message: "Nome e ordem são obrigatórios." });
+    if (!corFaixa || ordem === undefined)
+      return res.status(400).json({ message: "Cor da faixa e ordem são obrigatórios." });
 
     if (isNaN(Number(ordem)))
       return res.status(400).json({ message: "A ordem deve ser um número." });
@@ -27,7 +27,7 @@ export const criarFaixa = async (req, res) => {
       return res.status(400).json({ message: "Já existe uma faixa com essa ordem." });
 
     const faixa = await prisma.faixa.create({
-      data: { nome, ordem: Number(ordem), imagem_faixa_url },
+      data: { corFaixa, ordem: Number(ordem), imagem_faixa_url },
     });
 
     return res.status(201).json(faixa);
@@ -59,7 +59,6 @@ export const listarFaixas = async (req, res) => {
 
 export const obterFaixaPorId = async (req, res) => {
   try {
-    console.log("PARAMS RECEBIDOS:", req.params); // <-- DEBUG
     const { id } = req.params;
 
     if (!id) {
@@ -87,13 +86,12 @@ export const obterFaixaPorId = async (req, res) => {
   }
 };
 
-
 export const atualizarFaixa = async (req, res) => {
   try {
     requireRole(req.user, ["ADMIN", "COORDENADOR"]);
 
     const { id } = req.params;
-    const { nome, ordem, imagem_faixa_url } = req.body;
+    const { corFaixa, ordem, imagem_faixa_url } = req.body;
 
     const faixa = await prisma.faixa.findUnique({
       where: { id: Number(id) },
@@ -117,7 +115,7 @@ export const atualizarFaixa = async (req, res) => {
     const faixaAtualizada = await prisma.faixa.update({
       where: { id: Number(id) },
       data: {
-        ...(nome && { nome }),
+        ...(corFaixa && { corFaixa }),
         ...(ordem !== undefined && { ordem: Number(ordem) }),
         ...(imagem_faixa_url && { imagem_faixa_url }),
       }
@@ -144,7 +142,6 @@ export const deletarFaixa = async (req, res) => {
     if (!faixa)
       return res.status(404).json({ message: "Faixa não encontrada." });
 
-    // Verificar alunos
     const alunos = await prisma.aluno.findMany({
       where: { faixaId: Number(id) },
     });
@@ -154,7 +151,6 @@ export const deletarFaixa = async (req, res) => {
         message: "Não é possível excluir uma faixa com alunos vinculados.",
       });
 
-    // Verificar requisitos e graduações
     const requisitos = await prisma.requisito.findMany({
       where: { faixaId: Number(id) },
     });

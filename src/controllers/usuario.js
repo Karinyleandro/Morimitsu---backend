@@ -58,6 +58,60 @@ export const listarUsuarios = async (req, res) => {
   }
 };
 
+export const listarCoordenadoresProfessores = async (req, res) => {
+  try {
+    if (!["ADMIN", "COORDENADOR"].includes(req.user.tipo)) {
+      return res.status(403).json({ message: "Acesso negado" });
+    }
+
+    const { nome, tipo, page = 1, limit = 20 } = req.query;
+
+    // TIPOS PERMITIDOS
+    const tiposPermitidos = ["PROFESSOR", "COORDENADOR"];
+
+    // se o front enviar um tipo inválido, ignora
+    const filtroTipo = tiposPermitidos.includes(tipo) ? tipo : undefined;
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const filtro = {
+      ...(filtroTipo ? { tipo: filtroTipo } : { tipo: { in: tiposPermitidos } }),
+      ...(nome ? { nome: { contains: nome, mode: "insensitive" } } : {}),
+    };
+
+    const total = await prisma.usuario.count({ where: filtro });
+
+    const usuarios = await prisma.usuario.findMany({
+      where: filtro,
+      skip,
+      take: Number(limit),
+      orderBy: { nome: "asc" },
+      include: {
+        responsaveis: true,
+        turma_matriculas: { include: { turma: true } },
+        faixa: true,
+      },
+    });
+
+    return res.json({
+      sucesso: true,
+      total,
+      paginaAtual: Number(page),
+      totalPaginas: Math.ceil(total / limit),
+      dados: usuarios,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Erro ao listar usuários com filtro de cargo",
+      detalhe: error.message
+    });
+  }
+};
+
+
+
+
 // ==================== OBTER DETALHADO ====================
 export const obterUsuarioDetalhado = async (req, res) => {
   try {

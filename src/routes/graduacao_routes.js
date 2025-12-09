@@ -40,6 +40,37 @@ router.get(
   GraduacaoController.listarAptos
 );
 
+
+/**
+ * @swagger
+ * /graduacao/status/{alunoId}:
+ *   get:
+ *     summary: Retorna o status do aluno (Concluído, Próximo, Longe)
+ *     tags: [Graduações]
+ *     parameters:
+ *       - in: path
+ *         name: alunoId
+ *         required: true
+ *         description: UUID do aluno
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *           example: "9e5261f6-5bbd-4d34-94fa-0b1faed31c91"
+ *     responses:
+ *       200:
+ *         description: Status retornado com sucesso
+ *       404:
+ *         description: Aluno não encontrado
+ *       500:
+ *         description: Erro interno
+ */
+router.get(
+  "/status/:alunoId",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR", "ALUNO"),
+  GraduacaoController.statusAluno
+);
+
 /* -------------------------------------------------------------------------- */
 /*                                GRADUAR ALUNO                               */
 /* -------------------------------------------------------------------------- */
@@ -151,6 +182,40 @@ router.get(
   authenticate,
   authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
   GraduacaoController.graduacaoAtual
+);
+
+/* -------------------------------------------------------------------------- */
+/*                           GRADUAÇÃO FUTURA                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @swagger
+ * /graduacao/futura/{alunoId}:
+ *   get:
+ *     summary: Retorna o próximo grau e próxima faixa do aluno
+ *     tags: [Graduações]
+ *     parameters:
+ *       - in: path
+ *         name: alunoId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *           example: "9e5261f6-5bbd-4d34-94fa-0b1faed31c91"
+ *         description: UUID do aluno
+ *     responses:
+ *       200:
+ *         description: Próximo grau e próxima faixa retornados com sucesso
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno
+ */
+router.get(
+  "/futura/:alunoId",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
+  GraduacaoController.graduacaoFutura
 );
 
 export default router;

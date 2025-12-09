@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { padraoRespostaErro } from '../validations/turma.validators.js';
 
 
+
 const prisma = new PrismaClient();
 
 export const listarAlunosPorTurma = async (req, res) => {
@@ -163,6 +164,14 @@ export const criarTurma = async (req, res) => {
 
     if (!nome || !responsavelId || faixaEtariaMin == null || faixaEtariaMax == null)
       return padraoRespostaErro(res, "Campos obrigatórios faltando", 400);
+
+    const nomeDuplicado = await prisma.turma.findFirst({
+      where: { nome_turma: nome }
+    });
+
+    if (nomeDuplicado) {
+      return padraoRespostaErro(res, "Já existe uma turma com esse nome", 400);
+    }
 
     const resp = await prisma.usuario.findUnique({
       where: { id: responsavelId }
@@ -377,11 +386,11 @@ export const desenturmarAluno = async (req, res) => {
   }
 };
 
-
 export const registrarFrequencia = async (req, res) => {
   try {
     const usuarioLogado = req.user;
 
+    // Tipos de usuário permitidos
     const permitidos = ["PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR", "ADMIN"];
     if (!permitidos.includes(usuarioLogado.tipo)) {
       return padraoRespostaErro(res, "Sem permissão", 403);
@@ -398,14 +407,11 @@ export const registrarFrequencia = async (req, res) => {
       );
     }
 
-    // Verifica turma
-    const turma = await prisma.turma.findUnique({
-      where: { id: turmaId } // <- UUID agora
-    });
-
+    // Buscar turma
+    const turma = await prisma.turma.findUnique({ where: { id: turmaId } });
     if (!turma) return padraoRespostaErro(res, "Turma não encontrada", 404);
 
-    // Professor só registra sua própria turma
+    // Validar professor/aluno-professor
     if (
       ["PROFESSOR", "ALUNO_PROFESSOR"].includes(usuarioLogado.tipo) &&
       turma.id_professor !== usuarioLogado.id
@@ -413,53 +419,152 @@ export const registrarFrequencia = async (req, res) => {
       return padraoRespostaErro(res, "Não autorizado para registrar nesta turma", 403);
     }
 
-    // Converte a data
     const dataAula = new Date(data);
 
+    // Buscar registros existentes dessa aula
+    const existentes = await prisma.frequencia.findMany({
+      where: { id_turma: turmaId, data_aula: dataAula, horario_aula: horario }
+    });
+    const mapExistentes = new Map(existentes.map(e => [e.id_aluno, e]));
+
+    // Buscar todos os alunos matriculados na turma
+    const alunosTurma = await prisma.aluno_Turma.findMany({
+      where: { id_turma: turmaId },
+      select: { id_aluno: true }
+    });
+    const alunosValidos = new Set(alunosTurma.map(a => a.id_aluno));
+
+    if (alunosValidos.size === 0) {
+      return padraoRespostaErro(res, "Nenhum aluno matriculado na turma", 400);
+    }
+
+    const novos = [];
+    const updates = [];
+
     for (const f of frequencias) {
-      if (!f.alunoId || typeof f.presente !== "boolean") continue;
+      if (!f.alunoId || typeof f.presente !== "boolean") {
+        return padraoRespostaErro(res, "Formato de frequência inválido", 400);
+      }
 
-      // Busca registro existente (com horário agora)
-      const existente = await prisma.frequencia.findFirst({
-        where: {
-          id_turma: turmaId,
-          id_aluno: f.alunoId,
-          data_aula: dataAula,
-          horario_aula: horario
-        }
-      });
+      // Validar se o aluno pertence à turma
+      if (!alunosValidos.has(f.alunoId)) {
+        return padraoRespostaErro(
+          res,
+          `Aluno com ID ${f.alunoId} não está matriculado nesta turma`,
+          400
+        );
+      }
 
-      if (existente) {
-        await prisma.frequencia.update({
-          where: { id: existente.id },
-          data: {
-            presente: f.presente,
-            id_registrador: usuarioLogado.id
-          }
+      const jaExiste = mapExistentes.get(f.alunoId);
+
+      if (jaExiste) {
+        updates.push({
+          where: { id: jaExiste.id },
+          data: { presente: f.presente, id_registrador: usuarioLogado.id }
         });
       } else {
-        await prisma.frequencia.create({
-          data: {
-            id_turma: turmaId,
-            id_aluno: f.alunoId,
-            id_registrador: usuarioLogado.id,
-            presente: f.presente,
-            data_aula: dataAula,
-            horario_aula: horario
-          }
+        novos.push({
+          id_turma: turmaId,
+          id_aluno: f.alunoId,
+          id_registrador: usuarioLogado.id,
+          presente: f.presente,
+          data_aula: dataAula,
+          horario_aula: horario
         });
       }
     }
 
-    return res.status(201).json({
-      mensagem: "Frequência registrada com sucesso"
-    });
+    // Criar novos registros
+    if (novos.length > 0) {
+      await prisma.frequencia.createMany({ data: novos });
+    }
+
+    // Atualizar existentes
+    if (updates.length > 0) {
+      await prisma.$transaction(
+        updates.map(u => prisma.frequencia.update({ where: u.where, data: u.data }))
+      );
+    }
+
+    return res.status(201).json({ mensagem: "Frequência registrada com sucesso" });
 
   } catch (err) {
     console.error("Erro registrarFrequencia:", err);
     return padraoRespostaErro(res, "Erro ao registrar frequência", 500);
   }
 };
+
+
+
+
+export const rankingFrequencia = async (req, res) => {
+  try {
+    const usuarioLogado = req.user;
+
+    const permitidos = ["PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR", "ADMIN"];
+    if (!permitidos.includes(usuarioLogado.tipo)) {
+      return padraoRespostaErro(res, "Sem permissão", 403);
+    }
+
+    const { turmaId } = req.params;
+    if (!turmaId) return padraoRespostaErro(res, "turmaId é obrigatório", 400);
+
+    // Verifica se a turma existe
+    const turma = await prisma.turma.findUnique({
+      where: { id: turmaId },
+      include: { aluno_turmas: { include: { aluno: true } } }
+    });
+
+    if (!turma) return padraoRespostaErro(res, "Turma não encontrada", 404);
+
+    // Busca todas as frequências da turma
+    const frequencias = await prisma.frequencia.findMany({
+      where: { id_turma: turmaId }
+    });
+
+    // Prepara mapa para acumular
+    const mapa = new Map();
+
+    for (const at of turma.aluno_turmas) {
+      mapa.set(at.id_aluno, {
+        alunoId: at.id_aluno,
+        nome: at.aluno?.nome ?? null,
+        total: 0,
+        presencas: 0
+      });
+    }
+
+    // Computa presença e total
+    for (const f of frequencias) {
+      if (mapa.has(f.id_aluno)) {
+        const obj = mapa.get(f.id_aluno);
+        obj.total++;
+        if (f.presente) obj.presencas++;
+      }
+    }
+
+    // Transforma ranking
+    const ranking = Array.from(mapa.values())
+      .map((a) => ({
+        ...a,
+        percentual:
+          a.total === 0 ? 0 : Number(((a.presencas / a.total) * 100).toFixed(2))
+      }))
+      .sort((a, b) => b.percentual - a.percentual);
+
+    // <-- aqui: responder diretamente sem usar padraoSucesso (que não existe)
+    return res.status(200).json({
+      dados: ranking,
+      total: ranking.length,
+      turmaId
+    });
+
+  } catch (err) {
+    console.error("Erro rankingFrequencia:", err);
+    return padraoRespostaErro(res, "Erro ao gerar ranking", 500);
+  }
+};
+
 
 
 export const consultarFrequencias = async (req, res) => {
