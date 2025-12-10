@@ -201,10 +201,6 @@ async listarAptosGraduacao(req, res) {
           imagem: faixaAtual?.imagem_faixa_url ?? null
         },
         turma: aluno.turma_matriculas?.[0]?.turma?.nome_turma ?? "Sem turma",
-        status: "PRONTO",
-        aulasPresente,
-        minimoAulas: minimo,
-        proximaFaixa: { cor: proximaFaixa?.corFaixa ?? null }
       });
     }
 
