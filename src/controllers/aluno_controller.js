@@ -1,4 +1,6 @@
 import prisma from "../prisma.js";
+import bcrypt from "bcrypt";
+
 
 // ==================== LISTAR ALUNOS ====================
 export const listarAlunos = async (req, res) => {
@@ -89,22 +91,61 @@ export const detalhesAluno = async (req, res) => {
 // ==================== PROMOVER ALUNO ====================
 export const promoverAlunoProfessor = async (req, res) => {
   try {
-    const { id } = req.params;
-    const aluno = await prisma.usuario.findUnique({ where: { id } });
+    const usuarioLogado = req.user; // quem está fazendo a requisição
+    const { id } = req.params;      // id do aluno
+    const { email, senha } = req.body; // json enviado no body
 
-    if (!aluno || aluno.tipo !== "ALUNO") {
-      return res.status(400).json({ message: "Aluno não encontrado ou já é professor/aluno professor" });
+    /* ----------------------------- PERMISSÃO ----------------------------- */
+    if (usuarioLogado.tipo !== "COORDENADOR") {
+      return res.status(403).json({
+        message: "Apenas COORDENADORES podem promover um aluno a ALUNO_PROFESSOR."
+      });
     }
 
+    /* ----------------------------- VALIDA BODY --------------------------- */
+    if (!email || !senha) {
+      return res.status(400).json({
+        message: "É necessário enviar email e senha no body da requisição."
+      });
+    }
+
+    /* ----------------------------- BUSCAR ALUNO -------------------------- */
+    const aluno = await prisma.usuario.findUnique({ where: { id } });
+
+    if (!aluno) {
+      return res.status(404).json({ message: "Aluno não encontrado." });
+    }
+
+    if (aluno.tipo !== "ALUNO") {
+      return res.status(400).json({
+        message: "Este usuário não é um ALUNO ou já é ALUNO_PROFESSOR."
+      });
+    }
+
+    /* --------------------------- GERAR HASH SENHA ------------------------ */
+    const passwordHash = await bcrypt.hash(senha, 10);
+
+    /* ----------------------------- ATUALIZAR ----------------------------- */
     const atualizado = await prisma.usuario.update({
       where: { id },
-      data: { tipo: "ALUNO_PROFESSOR" }
+      data: {
+        tipo: "ALUNO_PROFESSOR",
+        email,
+        passwordHash
+      }
     });
 
-    return res.status(200).json({ message: "Aluno promovido a ALUNO_PROFESSOR", aluno: atualizado });
+    return res.status(200).json({
+      message: "Aluno promovido a ALUNO_PROFESSOR com sucesso.",
+      aluno: atualizado
+    });
+
   } catch (error) {
     console.error("Erro ao promover aluno:", error);
-    return res.status(500).json({ message: "Erro interno do servidor", error: error.message });
+    return res.status(500).json({
+      message: "Erro interno do servidor",
+      error: error.message
+    });
   }
 };
 

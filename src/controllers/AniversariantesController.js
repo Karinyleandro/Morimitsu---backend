@@ -45,7 +45,124 @@ function diaDe(date) {
   return new Date(date).getDate();
 }
 
-class AniversariantesController {
+class AniversariantesController {/**
+ * GET /aniversariantes/mes
+ * → Lista todos alunos que fazem aniversário no mês atual
+ * → Destaca quem faz aniversário HOJE com isToday = true
+ */
+static async aniversariantesDoMes(req, res) {
+  try {
+    const requester = req.user;
+
+    if (!["PROFESSOR", "COORDENADOR", "ADMIN", "ALUNO_PROFESSOR"].includes(requester.tipo)) {
+      return res.status(403).json({ message: "Permissão negada" });
+    }
+
+    // HOJE EM UTC PARA EVITAR BUG DE FUSO
+    const hoje = new Date();
+    const mesAtual = hoje.getUTCMonth() + 1;
+    const diaHoje = hoje.getUTCDate();
+
+    // corrigido: usar UTC
+    function calcularProximoAniversario(dataNascimentoIso) {
+      const hojeLocal = new Date();
+
+      const nasc = new Date(dataNascimentoIso);
+
+      let prox = new Date(
+        hojeLocal.getUTCFullYear(),
+        nasc.getUTCMonth(),
+        nasc.getUTCDate()
+      );
+
+      const hojeUTC = new Date(
+        hojeLocal.getUTCFullYear(),
+        hojeLocal.getUTCMonth(),
+        hojeLocal.getUTCDate()
+      );
+
+      if (prox < hojeUTC) {
+        prox = new Date(
+          hojeLocal.getUTCFullYear() + 1,
+          nasc.getUTCMonth(),
+          nasc.getUTCDate()
+        );
+      }
+
+      const yyyy = prox.getUTCFullYear();
+      const mm = String(prox.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(prox.getUTCDate()).padStart(2, "0");
+
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function calcularIdade(dataNascimentoIso) {
+      const hoje = new Date();
+      const nasc = new Date(dataNascimentoIso);
+
+      let idade = hoje.getUTCFullYear() - nasc.getUTCFullYear();
+
+      const m = hoje.getUTCMonth() - nasc.getUTCMonth();
+      if (m < 0 || (m === 0 && hoje.getUTCDate() < nasc.getUTCDate())) {
+        idade--;
+      }
+      return idade;
+    }
+
+    // Buscar alunos
+    const alunos = await prisma.usuario.findMany({
+      where: {
+        tipo: "ALUNO",
+        ativo: true,
+        dataNascimento: { not: null }
+      },
+      select: {
+        id: true,
+        nome: true,
+        dataNascimento: true
+      }
+    });
+
+    // Processar aniversariantes
+    const lista = alunos
+      .map(a => {
+        const nasc = a.dataNascimento;
+
+        // AQUI ESTÁ A CORREÇÃO!!!
+        const mes = nasc.getUTCMonth() + 1;
+        const dia = nasc.getUTCDate();
+
+        return {
+          id: a.id,
+          nome: a.nome,
+          dataNascimento: nasc.toISOString().split("T")[0],
+          mes,
+          dia,
+          idade: calcularIdade(nasc),
+          proximoAniversario: calcularProximoAniversario(nasc),
+          isToday: mes === mesAtual && dia === diaHoje
+        };
+      })
+      .filter(a => a.mes === mesAtual)
+      .sort((a, b) => a.dia - b.dia || a.nome.localeCompare(b.nome));
+
+    return res.status(200).json({
+      mesAtual,
+      count: lista.length,
+      aniversariantes: lista
+    });
+
+  } catch (error) {
+    console.error("Erro ao listar aniversariantes do mês:", error);
+    return res.status(500).json({
+      message: "Erro interno",
+      error: error.message
+    });
+  }
+}
+
+
+
   /**
    * GET /aniversariantes?mes=NUMBER
    */

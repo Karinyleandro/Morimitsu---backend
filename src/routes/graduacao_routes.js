@@ -8,12 +8,60 @@ const router = Router();
 /*                                   SWAGGER                                  */
 /* -------------------------------------------------------------------------- */
 
+
+
 /**
  * @swagger
  * tags:
  *   name: Graduações
  *   description: Endpoints do sistema de graduação dos alunos.
  */
+
+/**
+ * @swagger
+ * /graduacao/aptos/tela:
+ *   get:
+ *     summary: Lista alunos aptos à graduação com imagens e informações completas
+ *     tags: [Graduações]
+ *     responses:
+ *       200:
+ *         description: Lista de alunos aptos com faixa, perfil e turma
+ *       403:
+ *         description: Acesso não autorizado
+ *       500:
+ *         description: Erro interno
+ */
+router.get(
+  "/aptos/tela",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
+  GraduacaoController.listarAptosGraduacao
+);
+
+/* -------------------------------------------------------------------------- */
+/*                        HOME – APTOS (RETORNO SIMPLES)                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @swagger
+ * /graduacao/home/aptos:
+ *   get:
+ *     summary: Lista alunos prontos ou próximos à graduação (retorno simplificado)
+ *     tags: [Graduações]
+ *     responses:
+ *       200:
+ *         description: Lista de alunos com nome, turma e status
+ *       403:
+ *         description: Acesso não autorizado
+ *       500:
+ *         description: Erro interno
+ */
+router.get(
+  "/home/aptos",
+  authenticate,
+  authorize("ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO_PROFESSOR"),
+  GraduacaoController.listarAptosHome
+);
 
 /* -------------------------------------------------------------------------- */
 /*                               LISTAR APTOS                                 */

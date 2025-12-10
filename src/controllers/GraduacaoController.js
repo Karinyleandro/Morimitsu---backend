@@ -74,6 +74,151 @@ const padraoSucesso = (res, dados) => res.json(dados);
 
 const GraduacaoController = {
 
+/* ------------------------ HOME — APTOS SIMPLES ------------------------ */
+async listarAptosHome(req, res) {
+  try {
+    const alunos = await prisma.usuario.findMany({
+      where: { tipo: { in: ["ALUNO", "ALUNO_PROFESSOR"] } },
+      include: {
+        faixa: true,
+        graduacoes: { orderBy: { data_graduacao: "desc" } },
+        turma_matriculas: {
+          take: 1,
+          select: {
+            turma: {
+              select: {
+                nome_turma: true // <- CORRIGIDO: era 'nome'
+              }
+            }
+          }
+        }
+      },
+    });
+
+    const resposta = [];
+
+    for (const aluno of alunos) {
+      const idade = calcularIdade(aluno.dataNascimento);
+      const aulasPresente = await contarAulasPresente(aluno.id);
+      const { requisito, nextGrau } = await obterRequisitoParaProximoGrau(aluno);
+      const { faixaAtual, proximaFaixa } = await obterProximaFaixaAtual(aluno);
+
+      const minimo =
+        requisito?.requisito_aulas ??
+        aulasNecessarias(faixaAtual?.nome, idade);
+
+      // validar tempo mínimo entre graduações
+      let tempoOk = true;
+      if (requisito?.tempo_minimo_dias) {
+        const ultima = aluno.graduacoes?.[0];
+        if (ultima) {
+          const dias = Math.floor(
+            (Date.now() - new Date(ultima.data_graduacao)) / (1000 * 60 * 60 * 24)
+          );
+          tempoOk = dias >= requisito.tempo_minimo_dias;
+        }
+      }
+
+      const faltam = Math.max(0, minimo - aulasPresente);
+
+      // status baseado nas presenças
+      let status = "Longe";
+      if (faltam === 0 && tempoOk) status = "PRONTO";
+      else if (faltam <= 5) status = "PRÓXIMO";
+
+      if (status === "Longe") continue;
+
+      resposta.push({
+        nome: aluno.nome,
+        turma: aluno.turma_matriculas?.[0]?.turma?.nome_turma ?? "Sem turma", // <- CORRIGIDO
+        status,
+        proximaFaixa: status === "PRONTO"
+          ? { cor: proximaFaixa?.corFaixa ?? null }
+          : null,
+        aulasPresente,
+        minimoAulas: minimo,
+      });
+    }
+
+    return padraoSucesso(res, resposta);
+
+  } catch (err) {
+    console.error(err);
+    return padraoErro(res, "Erro ao listar aptos (home).", 500);
+  }
+},
+
+/* ------------------------ LISTAR APTOS — TELA GRADUAÇÃO ------------------------ */
+async listarAptosGraduacao(req, res) {
+  try {
+    const alunos = await prisma.usuario.findMany({
+      where: { tipo: { in: ["ALUNO", "ALUNO_PROFESSOR"] } },
+      include: {
+        faixa: true,
+        graduacoes: { orderBy: { data_graduacao: "desc" } },
+        turma_matriculas: {
+          take: 1,
+          select: {
+            turma: {
+              select: {
+                nome_turma: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const aptos = [];
+
+    for (const aluno of alunos) {
+      const idade = calcularIdade(aluno.dataNascimento);
+      const aulasPresente = await contarAulasPresente(aluno.id);
+      const { requisito, nextGrau } = await obterRequisitoParaProximoGrau(aluno);
+      const { faixaAtual, proximaFaixa } = await obterProximaFaixaAtual(aluno);
+
+      const minimo =
+        requisito?.requisito_aulas ?? aulasNecessarias(faixaAtual?.nome, idade);
+
+      let tempoOk = true;
+      if (requisito?.tempo_minimo_dias) {
+        const ultima = aluno.graduacoes?.[0];
+        if (ultima) {
+          const dias = Math.floor(
+            (Date.now() - new Date(ultima.data_graduacao)) / (1000 * 60 * 60 * 24)
+          );
+          tempoOk = dias >= requisito.tempo_minimo_dias;
+        }
+      }
+
+      const faltam = Math.max(0, minimo - aulasPresente);
+
+      // status: apenas alunos aptos (PRONTO ou PROXIMO)
+      let status = "Longe";
+      if (faltam === 0 && tempoOk) status = "PRONTO";
+      else if (faltam <= 5) status = "PROXIMO";
+
+      if (status === "Longe") continue;
+
+      aptos.push({
+        alunoId: aluno.id,
+        nome: aluno.nome,
+        imagemPerfil: aluno.imagem_perfil_url ?? null, // imagem do aluno
+        faixaAtual: {
+          imagem: faixaAtual?.imagem_faixa_url ?? null, // imagem da faixa
+        },
+        turma: aluno.turma_matriculas?.[0]?.turma?.nome_turma ?? "Sem turma",
+      });
+    }
+
+    return padraoSucesso(res, aptos);
+  } catch (err) {
+    console.error(err);
+    return padraoErro(res, "Erro ao listar aptos para graduação (tela).", 500);
+  }
+},
+
+
 /* ---------------------- STATUS INDIVIDUAL ---------------------- */
 async statusAluno(req, res) {
   try {
@@ -248,10 +393,7 @@ async graduarAluno(req, res) {
     });
 
     if (!aluno) return padraoErro(res, "Aluno não encontrado.", 404);
-
-    if (!aluno.id_faixa) {
-      return padraoErro(res, "Aluno não possui faixa inicial definida.", 400);
-    }
+    if (!aluno.id_faixa) return padraoErro(res, "Aluno não possui faixa inicial definida.", 400);
 
     const idade = calcularIdade(aluno.dataNascimento);
 
@@ -262,21 +404,13 @@ async graduarAluno(req, res) {
 
     const { requisito, nextGrau } = reqObj;
 
-    const minimo =
-      requisito?.requisito_aulas ??
-      aulasNecessarias(aluno.faixa?.nome, idade);
+    const minimo = requisito?.requisito_aulas ?? aulasNecessarias(aluno.faixa?.nome, idade);
+    if (aulasPresente < minimo) return padraoErro(res, "Aluno não possui aulas suficientes.");
 
-    if (aulasPresente < minimo)
-      return padraoErro(res, "Aluno não possui aulas suficientes.");
-
-    // Interstício mínimo
     if (requisito?.tempo_minimo_dias) {
       const ultima = aluno.graduacoes?.[0];
       if (ultima) {
-        const dias = Math.floor(
-          (Date.now() - new Date(ultima.data_graduacao)) /
-            (1000 * 60 * 60 * 24)
-        );
+        const dias = Math.floor((Date.now() - new Date(ultima.data_graduacao)) / (1000*60*60*24));
         if (dias < requisito.tempo_minimo_dias)
           return padraoErro(res, "Interstício mínimo não cumprido.");
       }
@@ -284,17 +418,14 @@ async graduarAluno(req, res) {
 
     /* --------- NOVO GRAU / FAIXA -------- */
     const GRAU_MAX = 4;
-
     let novoGrau = nextGrau;
     let novaFaixaId = aluno.id_faixa;
 
-    // Caso ultrapasse o grau máximo, troca a faixa automaticamente
     if (novoGrau > GRAU_MAX) {
       const proxima = await prisma.faixa.findFirst({
         where: { ordem: { gt: aluno.faixa?.ordem ?? 0 } },
         orderBy: { ordem: "asc" },
       });
-
       if (proxima) {
         novaFaixaId = proxima.id;
         novoGrau = 0;
@@ -320,20 +451,15 @@ async graduarAluno(req, res) {
       },
     });
 
-    /* --------- PEGA A NOVA FAIXA -------- */
-    const faixaNova = await prisma.faixa.findUnique({
-      where: { id: novaFaixaId },
+    /* --------- ZERAR PRESENÇAS -------- */
+    await prisma.frequencia.deleteMany({
+      where: { id_aluno: aluno.id, presente: true },
     });
 
     /* --------- UPGRADE PARA ALUNO_PROFESSOR -------- */
-    if (
-      faixaNova?.nome?.toLowerCase().includes("roxa") &&
-      usuarioAtualizado.tipo === "ALUNO"
-    ) {
-      await prisma.usuario.update({
-        where: { id: aluno.id },
-        data: { tipo: "ALUNO_PROFESSOR" },
-      });
+    const faixaNova = await prisma.faixa.findUnique({ where: { id: novaFaixaId } });
+    if (faixaNova?.nome?.toLowerCase().includes("roxa") && usuarioAtualizado.tipo === "ALUNO") {
+      await prisma.usuario.update({ where: { id: aluno.id }, data: { tipo: "ALUNO_PROFESSOR" } });
     }
 
     /* --------- LOG -------- */
@@ -346,7 +472,7 @@ async graduarAluno(req, res) {
     });
 
     return padraoSucesso(res, {
-      mensagem: "Graduação concluída.",
+      mensagem: "Graduação concluída e presenças zeradas.",
       graduacao: registroGraduacao,
     });
 
@@ -355,6 +481,7 @@ async graduarAluno(req, res) {
     return padraoErro(res, "Erro ao graduar aluno.", 500);
   }
 },
+
 
 
   /* ---------------------- HISTÓRICO ---------------------- */

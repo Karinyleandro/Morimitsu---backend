@@ -7,7 +7,7 @@ import {
   detalhesAluno,
   promoverAlunoProfessor,
   consultarFrequencias,
-  consultarHistoricoFrequencias
+  consultarHistoricoFrequencias, 
 } from "../controllers/aluno_controller.js";
 
 const router = express.Router();
@@ -87,7 +87,7 @@ router.get("/:id", authenticate, detalhesAluno);
  * @openapi
  * /alunos/promover/{id}:
  *   patch:
- *     summary: Promover um aluno a ALUNO_PROFESSOR
+ *     summary: Promover um aluno para ALUNO_PROFESSOR
  *     tags:
  *       - alunos
  *     security:
@@ -99,11 +99,42 @@ router.get("/:id", authenticate, detalhesAluno);
  *         schema:
  *           type: string
  *         description: UUID do aluno
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - senha
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: novoemail@academia.com
+ *               senha:
+ *                 type: string
+ *                 example: SenhaGerada123
  *     responses:
  *       200:
  *         description: Aluno promovido com sucesso
+ *       400:
+ *         description: Dados inválidos ou aluno não pode ser promovido
+ *       403:
+ *         description: Acesso negado – apenas COORDENADORES podem promover
+ *       404:
+ *         description: Aluno não encontrado
+ *       500:
+ *         description: Erro interno do servidor
  */
-router.patch("/promover/:id", authenticate, authorize("COORDENADOR"), promoverAlunoProfessor);
+
+router.patch(
+  "/promover/:id",
+  authenticate,
+  authorize("COORDENADOR"),
+  promoverAlunoProfessor
+);
+
 
 /* =====================================================
    GET – CONSULTAR FREQUÊNCIAS
