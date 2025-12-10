@@ -148,9 +148,11 @@ async listarAptosHome(req, res) {
   }
 },
 
-/* ------------------------ LISTAR APTOS — TELA GRADUAÇÃO ------------------------ */
+/* ------------------------ LISTAR APTOS — TELA GRADUAÇÃO (APENAS PRONTOS) ------------------------ */
 async listarAptosGraduacao(req, res) {
   try {
+    const FOTO_PADRAO = "/fotoperfilsvg/Frame.svg"; // caminho da imagem padrão
+
     const alunos = await prisma.usuario.findMany({
       where: { tipo: { in: ["ALUNO", "ALUNO_PROFESSOR"] } },
       include: {
@@ -159,14 +161,10 @@ async listarAptosGraduacao(req, res) {
         turma_matriculas: {
           take: 1,
           select: {
-            turma: {
-              select: {
-                nome_turma: true,
-              },
-            },
-          },
-        },
-      },
+            turma: { select: { nome_turma: true } }
+          }
+        }
+      }
     });
 
     const aptos = [];
@@ -174,11 +172,10 @@ async listarAptosGraduacao(req, res) {
     for (const aluno of alunos) {
       const idade = calcularIdade(aluno.dataNascimento);
       const aulasPresente = await contarAulasPresente(aluno.id);
-      const { requisito, nextGrau } = await obterRequisitoParaProximoGrau(aluno);
+      const { requisito } = await obterRequisitoParaProximoGrau(aluno);
       const { faixaAtual, proximaFaixa } = await obterProximaFaixaAtual(aluno);
 
-      const minimo =
-        requisito?.requisito_aulas ?? aulasNecessarias(faixaAtual?.nome, idade);
+      const minimo = requisito?.requisito_aulas ?? aulasNecessarias(faixaAtual?.nome, idade);
 
       let tempoOk = true;
       if (requisito?.tempo_minimo_dias) {
@@ -193,21 +190,21 @@ async listarAptosGraduacao(req, res) {
 
       const faltam = Math.max(0, minimo - aulasPresente);
 
-      // status: apenas alunos aptos (PRONTO ou PROXIMO)
-      let status = "Longe";
-      if (faltam === 0 && tempoOk) status = "PRONTO";
-      else if (faltam <= 5) status = "PROXIMO";
-
-      if (status === "Longe") continue;
+      // Status apenas PRONTO (faltam 0 e tempoOk)
+      if (faltam !== 0 || !tempoOk) continue;
 
       aptos.push({
         alunoId: aluno.id,
         nome: aluno.nome,
-        imagemPerfil: aluno.imagem_perfil_url ?? null, // imagem do aluno
+        imagemPerfil: aluno.imagem_perfil_url || FOTO_PADRAO,
         faixaAtual: {
-          imagem: faixaAtual?.imagem_faixa_url ?? null, // imagem da faixa
+          imagem: faixaAtual?.imagem_faixa_url ?? null
         },
         turma: aluno.turma_matriculas?.[0]?.turma?.nome_turma ?? "Sem turma",
+        status: "PRONTO",
+        aulasPresente,
+        minimoAulas: minimo,
+        proximaFaixa: { cor: proximaFaixa?.corFaixa ?? null }
       });
     }
 
