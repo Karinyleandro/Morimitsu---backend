@@ -58,98 +58,61 @@ static async aniversariantesDoMes(req, res) {
       return res.status(403).json({ message: "Permissão negada" });
     }
 
-    // HOJE EM UTC PARA EVITAR BUG DE FUSO
+    const FOTO_PADRAO = "/fotoperfilsvg/Frame.svg"; // imagem padrão
+
+    // HOJE EM UTC
     const hoje = new Date();
     const mesAtual = hoje.getUTCMonth() + 1;
     const diaHoje = hoje.getUTCDate();
 
-    // corrigido: usar UTC
-    function calcularProximoAniversario(dataNascimentoIso) {
-      const hojeLocal = new Date();
-
-      const nasc = new Date(dataNascimentoIso);
-
-      let prox = new Date(
-        hojeLocal.getUTCFullYear(),
-        nasc.getUTCMonth(),
-        nasc.getUTCDate()
-      );
-
-      const hojeUTC = new Date(
-        hojeLocal.getUTCFullYear(),
-        hojeLocal.getUTCMonth(),
-        hojeLocal.getUTCDate()
-      );
-
-      if (prox < hojeUTC) {
-        prox = new Date(
-          hojeLocal.getUTCFullYear() + 1,
-          nasc.getUTCMonth(),
-          nasc.getUTCDate()
-        );
-      }
-
-      const yyyy = prox.getUTCFullYear();
-      const mm = String(prox.getUTCMonth() + 1).padStart(2, "0");
-      const dd = String(prox.getUTCDate()).padStart(2, "0");
-
-      return `${yyyy}-${mm}-${dd}`;
-    }
-
-    function calcularIdade(dataNascimentoIso) {
-      const hoje = new Date();
-      const nasc = new Date(dataNascimentoIso);
-
-      let idade = hoje.getUTCFullYear() - nasc.getUTCFullYear();
-
-      const m = hoje.getUTCMonth() - nasc.getUTCMonth();
-      if (m < 0 || (m === 0 && hoje.getUTCDate() < nasc.getUTCDate())) {
-        idade--;
-      }
-      return idade;
-    }
-
-    // Buscar alunos
+    // Buscar alunos ativos com data de nascimento
     const alunos = await prisma.usuario.findMany({
       where: {
-        tipo: "ALUNO",
+        tipo: { in: ["ALUNO", "ALUNO_PROFESSOR"] },
         ativo: true,
         dataNascimento: { not: null }
       },
-      select: {
-        id: true,
-        nome: true,
-        dataNascimento: true
+      include: {
+        turma_matriculas: {
+          take: 1,
+          select: {
+            turma: { select: { nome_turma: true } }
+          }
+        }
       }
     });
 
-    // Processar aniversariantes
-    const lista = alunos
-      .map(a => {
-        const nasc = a.dataNascimento;
-
-        // AQUI ESTÁ A CORREÇÃO!!!
+    const aniversariantes = alunos
+      .map(aluno => {
+        const nasc = aluno.dataNascimento;
         const mes = nasc.getUTCMonth() + 1;
         const dia = nasc.getUTCDate();
 
+        // Só retorna os do mês atual
+        if (mes !== mesAtual) return null;
+
+        const aniversarioFormatado = `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}`;
+
         return {
-          id: a.id,
-          nome: a.nome,
-          dataNascimento: nasc.toISOString().split("T")[0],
-          mes,
-          dia,
-          idade: calcularIdade(nasc),
-          proximoAniversario: calcularProximoAniversario(nasc),
-          isToday: mes === mesAtual && dia === diaHoje
+          nome: aluno.nome,
+          aniversario: aniversarioFormatado, // só dia/mês
+          turma: aluno.turma_matriculas?.[0]?.turma?.nome_turma ?? "Sem turma",
+          fotoPerfil: aluno.fotoUrl || FOTO_PADRAO,
+          isToday: dia === diaHoje
         };
       })
-      .filter(a => a.mes === mesAtual)
-      .sort((a, b) => a.dia - b.dia || a.nome.localeCompare(b.nome));
+      .filter(Boolean)
+      .sort((a, b) => {
+        // ordena por dia do mês e depois por nome
+        const diaA = parseInt(a.aniversario.split("/")[0], 10);
+        const diaB = parseInt(b.aniversario.split("/")[0], 10);
+        return diaA - diaB || a.nome.localeCompare(b.nome);
+      });
 
     return res.status(200).json({
       mesAtual,
-      count: lista.length,
-      aniversariantes: lista
+      count: aniversariantes.length,
+      aniversariantes
     });
 
   } catch (error) {
