@@ -511,7 +511,6 @@ export const registrarFrequencia = async (req, res) => {
 
 
 
-
 export const rankingFrequencia = async (req, res) => {
   try {
     const usuarioLogado = req.user;
@@ -524,32 +523,43 @@ export const rankingFrequencia = async (req, res) => {
     const { turmaId } = req.params;
     if (!turmaId) return padraoRespostaErro(res, "turmaId é obrigatório", 400);
 
-    // Verifica se a turma existe
     const turma = await prisma.turma.findUnique({
       where: { id: turmaId },
-      include: { aluno_turmas: { include: { aluno: true } } }
+      include: { 
+        aluno_turmas: { 
+          include: { 
+            aluno: {
+              select: {
+                id: true,
+                nome: true,
+                imagem_perfil_url: true // <-- 🔥 BUSCA A FOTO
+              }
+            } 
+          } 
+        } 
+      }
     });
 
     if (!turma) return padraoRespostaErro(res, "Turma não encontrada", 404);
 
-    // Busca todas as frequências da turma
+    const DEFAULT_IMG = "/fotoperfilsvg/Frame.svg"; // 🔥 caminho padrão público
+
     const frequencias = await prisma.frequencia.findMany({
       where: { id_turma: turmaId }
     });
 
-    // Prepara mapa para acumular
     const mapa = new Map();
 
     for (const at of turma.aluno_turmas) {
       mapa.set(at.id_aluno, {
         alunoId: at.id_aluno,
         nome: at.aluno?.nome ?? null,
+        foto: at.aluno?.imagem_perfil_url ?? DEFAULT_IMG, // 🔥 usa foto padrão
         total: 0,
         presencas: 0
       });
     }
 
-    // Computa presença e total
     for (const f of frequencias) {
       if (mapa.has(f.id_aluno)) {
         const obj = mapa.get(f.id_aluno);
@@ -558,7 +568,6 @@ export const rankingFrequencia = async (req, res) => {
       }
     }
 
-    // Transforma ranking
     const ranking = Array.from(mapa.values())
       .map((a) => ({
         ...a,
@@ -567,7 +576,6 @@ export const rankingFrequencia = async (req, res) => {
       }))
       .sort((a, b) => b.percentual - a.percentual);
 
-    // <-- aqui: responder diretamente sem usar padraoSucesso (que não existe)
     return res.status(200).json({
       dados: ranking,
       total: ranking.length,

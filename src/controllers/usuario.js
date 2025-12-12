@@ -14,14 +14,11 @@ function calcularIdade(dataNascimento) {
   return idade;
 }
 
-// ==================== LISTAR USUÁRIOS ====================
 export const listarUsuarios = async (req, res) => {
   try {
-    // Apenas ADMIN pode listar todos
     if (!["ADMIN", "COORDENADOR"].includes(req.user.tipo)) {
-  return res.status(403).json({ message: "Acesso negado" });
-}
-
+      return res.status(403).json({ message: "Acesso negado" });
+    }
 
     const { nome, tipo, page = 1, limit = 20 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -39,24 +36,38 @@ export const listarUsuarios = async (req, res) => {
       take: Number(limit),
       orderBy: { nome: "asc" },
       include: {
-        responsaveis: true,
-        turma_matriculas: { include: { turma: true } },
-        faixa: true,
-      },
+        faixa: true // inclui imagem_faixa_url
+      }
     });
 
-    res.json({
+    // Foto padrão somente para perfil
+    const fotoPerfilPadrao = "/fotoperfilsvg/Frame.svg";
+
+    const dados = usuarios.map(u => ({
+      id: u.id,
+      nome: u.nome,
+      tipo: u.tipo,
+      fotoPerfil: u.imagem_perfil_url ?? fotoPerfilPadrao,
+      fotoFaixa: u.faixa?.imagem_faixa_url ?? null
+    }));
+
+    return res.json({
       sucesso: true,
       total,
       paginaAtual: Number(page),
       totalPaginas: Math.ceil(total / limit),
-      dados: usuarios,
+      dados
     });
+
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Erro ao listar usuários", detalhe: error.message });
+    return res.status(500).json({
+      message: "Erro ao listar usuários",
+      detalhe: error.message
+    });
   }
 };
+
 
 export const listarCoordenadoresProfessores = async (req, res) => {
   try {
@@ -108,9 +119,6 @@ export const listarCoordenadoresProfessores = async (req, res) => {
     });
   }
 };
-
-
-
 
 // ==================== OBTER DETALHADO ====================
 export const obterUsuarioDetalhado = async (req, res) => {

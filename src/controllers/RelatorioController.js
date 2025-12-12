@@ -91,42 +91,53 @@ class RelatorioController {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // RANKING GERAL DE AULAS (RF-033)
-  // -----------------------------------------------------------------------
-  static async rankingGeral(req, res) {
-    try {
-      const ranking = await prisma.frequencia.groupBy({
-        by: ["id_aluno"],
-        where: { presente: true },
-        _count: { id: true }
-      });
+static async rankingGeral(req, res) {
+  try {
+    const ranking = await prisma.frequencia.groupBy({
+      by: ["id_aluno"],
+      where: { presente: true },
+      _count: { id: true }
+    });
 
-      const alunos = await prisma.usuario.findMany({
-        where: { id: { in: ranking.map(r => r.id_aluno) } },
-        select: { id: true, nome: true }
-      });
+    const alunos = await prisma.usuario.findMany({
+      where: { id: { in: ranking.map(r => r.id_aluno) } },
+      select: { 
+        id: true, 
+        nome: true,
+        imagem_perfil_url: true
+      }
+    });
 
-      const resultado = ranking.map(r => ({
+    const fotoPadrao = "/public/fotoperfilsvg/Frame.svg";
+
+    const resultado = ranking.map(r => {
+      const aluno = alunos.find(a => a.id === r.id_aluno);
+
+      return {
         alunoId: r.id_aluno,
-        nome: alunos.find(a => a.id === r.id_aluno)?.nome || "",
+        nome: aluno?.nome || "",
+        foto: aluno?.imagem_perfil_url ?? fotoPadrao,
         totalAulas: r._count.id
-      }))
-      .sort((a, b) => {
-        if (b.totalAulas !== a.totalAulas)
-          return b.totalAulas - a.totalAulas;
+      };
+    })
+    .sort((a, b) => {
+      if (b.totalAulas !== a.totalAulas)
+        return b.totalAulas - a.totalAulas;
 
-        return compararNomes(a, b); // desempate por nome (primeiro → sobrenome)
-      })
-      .slice(0, 3); // Top 3
+      return compararNomes(a, b);
+    })
+    .slice(0, 3);
 
-      return res.json(resultado);
+    return res.json(resultado);
 
-    } catch (error) {
-      console.error("Erro no ranking geral:", error);
-      return res.status(500).json({ message: "Erro ao gerar ranking geral" });
-    }
+  } catch (error) {
+    console.error("Erro no ranking geral:", error);
+    return res.status(500).json({ message: "Erro ao gerar ranking geral" });
   }
+}
+
+
+
 
   // -----------------------------------------------------------------------
   // RANKING POR TURMA (RF-034)
