@@ -18,7 +18,8 @@ import {
   logout,
   requestPasswordReset,
   verifyResetCode,
-  resetPassword
+  resetPassword,
+  //WhatsAppController
 } from "../controllers/auth.js";
 
 import { authenticate, authorize } from "../middlewares/auth.middleware.js";
@@ -281,7 +282,6 @@ router.post(
   validateBody(verifyResetCodeSchema),
   verifyResetCode
 );
-
 
 /**
  * @openapi

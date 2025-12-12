@@ -6,6 +6,8 @@ import dns from "node:dns";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { differenceInYears } from "date-fns";
+//import twilio from "twilio";
+//import { sendWhatsApp } from "../utils/whatsapp.js";
 
 // eu tenho que separar os usuários (eu usei uma única table para associar os usuários soq o aluno vai ter que ser outra table)
 
@@ -25,6 +27,10 @@ function validarSenhaForte(senha) {
   if (!/\d/.test(senha)) return "A senha deve conter pelo menos um número";
   return true;
 }
+
+// const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
+
+
 
 function createJwt(payload) {
   const jti = uuidv4();
@@ -403,34 +409,51 @@ export async function requestPasswordReset(req, res) {
   try {
     const { identifier } = req.body;
 
+    // Verifica se o usuário existe
     const user = await prisma.usuario.findFirst({
-      where: { OR: [{ email: identifier }, { cpf: identifier }] },
+      where: {
+        OR: [
+          { email: identifier },
+          { cpf: identifier }
+        ]
+      },
     });
 
-    if (!user) return res.json({ message: "Se existir, enviamos um email" });
+    if (!user) {
+      return res.status(404).json({
+        message: "Nenhum usuário encontrado com este email ou CPF."
+      });
+    }
 
+    // Apaga tokens antigos
     await prisma.passwordResetToken.deleteMany({
       where: { userId: user.id },
     });
 
     const code = generateCode(5);
 
+    // Cria novo token
     await prisma.passwordResetToken.create({
       data: {
         token: code,
         userId: user.id,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
       },
     });
 
+    // Envia email
     await sendPasswordResetEmail(user.email, code);
 
-    return res.json({ message: "Código enviado para o email" });
+    return res.json({
+      message: "Um código de recuperação foi enviado para o email informado."
+    });
+
   } catch (e) {
     console.error("Erro request:", e);
-    return res.status(500).json({ message: "Erro interno" });
+    return res.status(500).json({ message: "Erro interno no servidor." });
   }
 }
+
 
 export async function verifyResetCode(req, res) {
   try {
@@ -489,3 +512,83 @@ export async function resetPassword(req, res) {
     return res.status(500).json({ message: "Erro interno" });
   }
 }
+
+/*
+export const WhatsAppController = {
+  async enviarCodigo(req, res) {
+    try {
+      const { phone } = req.body;
+
+      if (!phone) {
+        return res.status(400).json({ message: "Telefone é obrigatório." });
+      }
+
+      const user = await prisma.usuario.findFirst({
+        where: { telefone: phone },
+      });
+
+      if (!user) {
+        return res.json({ message: "Se o número for válido, enviaremos um código." });
+      }
+
+      await prisma.smsToken.deleteMany({
+        where: { userId: user.id },
+      });
+
+      const code = generateCode(5);
+
+      await prisma.smsToken.create({
+        data: {
+          token: code,
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        },
+      });
+
+      const result = await sendWhatsApp(phone, `Seu código de verificação é: ${code}`);
+      console.log("WhatsApp enviado:", result.sid, result.status);
+
+      return res.json({ message: "Código enviado via WhatsApp." });
+    } catch (e) {
+      console.error("Erro ao enviar WhatsApp:", e);
+      return res.status(500).json({ message: "Erro interno." });
+    }
+  },
+
+  async validarCodigo(req, res) {
+    try {
+      const { phone, code } = req.body;
+
+      if (!phone || !code) {
+        return res.status(400).json({ message: "Telefone e código são obrigatórios." });
+      }
+
+      const user = await prisma.usuario.findFirst({
+        where: { telefone: phone },
+      });
+
+      if (!user) return res.status(400).json({ message: "Código inválido ou expirado." });
+
+      const token = await prisma.smsToken.findFirst({
+        where: {
+          userId: user.id,
+          token: code,
+          expiresAt: { gte: new Date() },
+        },
+      });
+
+      if (!token) return res.status(400).json({ message: "Código inválido ou expirado." });
+
+      // Pode deletar o token usado
+      await prisma.smsToken.delete({ where: { id: token.id } });
+
+      return res.json({ message: "Código válido." });
+    } catch (e) {
+      console.error("Erro ao validar WhatsApp:", e);
+      return res.status(500).json({ message: "Erro interno." });
+    }
+  },
+};*/
+
+
+

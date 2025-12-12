@@ -64,6 +64,7 @@ model Usuario {
   logs                  Log_Acao[]
   resetTokens           PasswordResetToken[]
   turmas_responsavel    TurmaResponsavel[]
+  smsTokens SmsToken[]
 }
 
 
@@ -184,6 +185,18 @@ model PasswordResetToken {
   expiresAt DateTime
   user      Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model SmsToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
 
 model RevokedToken {
   id        String   @id @default(uuid())
