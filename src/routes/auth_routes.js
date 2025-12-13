@@ -153,10 +153,10 @@ import { authenticate, authorize } from "../middlewares/auth.middleware.js";
 router.post(
   "/register",
   authenticate,
-  authorize("COORDENADOR"), // quem pode criar usuários
-  validateBody(registerSchema),
+  authorize("COORDENADOR"),
   register
 );
+
 
 
 /**
