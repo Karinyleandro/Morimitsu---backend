@@ -136,6 +136,10 @@ router.get("/:id", authenticate, obterUsuarioDetalhado);
  * /usuarios/perfil/{id}:
  *   patch:
  *     summary: Atualiza o próprio perfil do usuário
+ *     description: >
+ *       Atualiza os dados do próprio usuário autenticado.
+ *       Os campos **faixa**, **grau** e **tipo (cargo)** só podem ser alterados
+ *       por usuários do tipo **COORDENADOR**.
  *     tags:
  *       - Usuários
  *     security:
@@ -187,13 +191,25 @@ router.get("/:id", authenticate, obterUsuarioDetalhado);
  *               imagem_perfil_url:
  *                 type: string
  *                 example: "https://meusite.com/fotos/renato.jpg"
+ *
+ *               # ===== CAMPOS RESTRITOS AO COORDENADOR =====
+ *               faixa:
+ *                 type: string
+ *                 example: "Preta"
+ *               grau:
+ *                 type: integer
+ *                 example: 2
  *               tipo:
  *                 type: string
  *                 enum: [ADMIN, COORDENADOR, PROFESSOR, ALUNO, ALUNO_PROFESSOR]
- *                 example: "ALUNO"
+ *                 example: "PROFESSOR"
  *     responses:
  *       200:
  *         description: Perfil atualizado com sucesso
+ *       403:
+ *         description: Acesso negado
+ *       500:
+ *         description: Erro interno do servidor
  */
 router.patch(
   "/perfil/:id",
@@ -201,6 +217,7 @@ router.patch(
   validateBody(atualizarPerfilSchema),
   atualizarPerfil
 );
+
 
 
 /* =====================================================

@@ -148,45 +148,50 @@ export const obterUsuarioDetalhado = async (req, res) => {
     res.status(500).json({ message: "Erro interno", detalhe: error.message });
   }
 };
-
 // ==================== ATUALIZAR PERFIL DO USUÁRIO ====================
 export const atualizarPerfil = async (req, res) => {
   try {
     const usuarioId = req.params.id;
     const { id: logadoId, tipo: tipoLogado } = req.user;
-    
+
     const tiposPermitidos = ["PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR"];
     if (!tiposPermitidos.includes(tipoLogado)) {
       return res.status(403).json({ message: "Acesso negado" });
     }
 
     if (usuarioId !== logadoId) {
-      return res.status(403).json({ message: "Você só pode atualizar seu próprio perfil" });
+      return res.status(403).json({
+        message: "Você só pode atualizar seu próprio perfil"
+      });
     }
 
     const {
       nome,
       nome_social,
-      tipo,
       dataNascimento,
       cpf,
       genero,
       email,
       endereco,
-      password,
       telefone,
       imagem_perfil_url,
+      password,
+
+      // ===== CAMPOS CONTROLADOS =====
+      faixa, // nome da faixa (ex: "Preta")
+      grau,
+      tipo // cargo
     } = req.body;
 
-    // ======= OBJETO DINÂMICO =======
+    // ===== OBJETO DINÂMICO =====
     const dataToUpdate = {};
     const assign = (field, value) => {
       if (value !== undefined) dataToUpdate[field] = value;
     };
 
+    // ===== CAMPOS NORMAIS (TODOS) =====
     assign("nome", nome);
     assign("nome_social", nome_social);
-    assign("tipo", tipo);
     assign("cpf", cpf);
     assign("genero", genero);
     assign("email", email);
@@ -202,7 +207,48 @@ export const atualizarPerfil = async (req, res) => {
       dataToUpdate.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     }
 
-    // ======= EXECUTA UPDATE =======
+    // ===== CAMPOS ESPECIAIS (SÓ COORDENADOR) =====
+    if (tipoLogado === "COORDENADOR") {
+
+      // ===== FAIXA PELO NOME (corFaixa) =====
+      if (faixa !== undefined) {
+        if (!faixa) {
+          // remove a faixa do usuário
+          dataToUpdate.faixa = { disconnect: true };
+        } else {
+          const faixaEncontrada = await prisma.faixa.findFirst({
+            where: {
+              corFaixa: {
+                equals: faixa,
+                mode: "insensitive"
+              }
+            }
+          });
+
+          if (!faixaEncontrada) {
+            return res.status(400).json({
+              message: `Faixa '${faixa}' não encontrada`
+            });
+          }
+
+          dataToUpdate.faixa = {
+            connect: { id: faixaEncontrada.id }
+          };
+        }
+      }
+
+      // ===== GRAU =====
+      if (grau !== undefined) {
+        dataToUpdate.grau = grau;
+      }
+
+      // ===== TIPO (CARGO) =====
+      if (tipo !== undefined) {
+        dataToUpdate.tipo = tipo;
+      }
+    }
+
+    // ===== EXECUTA UPDATE =====
     const updatedUser = await prisma.usuario.update({
       where: { id: usuarioId },
       data: dataToUpdate,
@@ -211,6 +257,8 @@ export const atualizarPerfil = async (req, res) => {
         nome: true,
         nome_social: true,
         tipo: true,
+        faixa: true,
+        grau: true,
         dataNascimento: true,
         cpf: true,
         genero: true,
@@ -218,7 +266,6 @@ export const atualizarPerfil = async (req, res) => {
         endereco: true,
         telefone: true,
         imagem_perfil_url: true,
-       
       }
     });
 
@@ -229,9 +276,14 @@ export const atualizarPerfil = async (req, res) => {
 
   } catch (error) {
     console.error("Erro ao atualizar perfil:", error);
-    return res.status(500).json({ message: "Erro interno do servidor", error: error.message });
+    return res.status(500).json({
+      message: "Erro interno do servidor",
+      error: error.message
+    });
   }
 };
+
+
 
 
 // ==================== ATUALIZAR USUÁRIO ====================

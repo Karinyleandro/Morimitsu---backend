@@ -1,22 +1,36 @@
 import { z } from "zod";
 
-// ATUALIZAR USUÁRIO
+/* =====================================================
+   ATUALIZAR USUÁRIO (ADMIN / GERAL)
+===================================================== */
 export const atualizarUsuarioSchema = z
   .object({
     nome: z.string().optional(),
     nome_social: z.string().optional().nullable(),
-    tipo: z.enum(["ADMIN", "COORDENADOR", "PROFESSOR", "ALUNO", "ALUNO_PROFESSOR"]).optional(),
+
+    tipo: z.enum([
+      "ADMIN",
+      "COORDENADOR",
+      "PROFESSOR",
+      "ALUNO",
+      "ALUNO_PROFESSOR"
+    ]).optional(),
+
     endereco: z.string().optional().nullable(),
+
     dataNascimento: z
       .string()
-      .refine((date) => !date || !isNaN(Date.parse(date)), { message: "Data inválida" })
+      .refine((date) => !date || !isNaN(Date.parse(date)), {
+        message: "Data inválida"
+      })
       .optional()
       .nullable(),
+
     cpf: z.string().optional().nullable(),
     telefone: z.string().optional().nullable(),
     genero: z.enum(["M", "F", "O"]).optional(),
 
-    // Array de responsáveis (sempre array, nunca null)
+    // ===== RESPONSÁVEIS =====
     responsaveis: z
       .array(
         z.object({
@@ -28,24 +42,28 @@ export const atualizarUsuarioSchema = z
       .optional()
       .default([]),
 
+    // ===== CAMPOS DE ALUNO / GRADUAÇÃO =====
     id_faixa: z.string().optional().nullable(),
-    grau: z.number().optional().nullable(),
+    grau: z.number().int().optional().nullable(),
     num_matricula: z.string().optional().nullable(),
 
-    // Array de turmas (sempre array)
+    // ===== TURMAS =====
     turmaIds: z.array(z.string()).optional().default([]),
 
     aulas: z.number().optional().nullable(),
 
     email: z.string().email().optional().nullable(),
     password: z.string().optional().nullable(),
+
     cargo_aluno: z.string().optional().nullable(),
     ativo: z.boolean().optional(),
+
     imagem_perfil_url: z.string().url().optional().nullable(),
     ultimo_login: z.string().optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    // Tipos que precisam obrigatoriamente de email e senha
+
+    // ===== EMAIL E SENHA OBRIGATÓRIOS =====
     if (["ADMIN", "ALUNO_PROFESSOR"].includes(data.tipo)) {
       if (!data.email) {
         ctx.addIssue({
@@ -63,9 +81,12 @@ export const atualizarUsuarioSchema = z
       }
     }
 
-    // Responsáveis obrigatórios para alunos menores de 18 anos
+    // ===== RESPONSÁVEIS PARA MENORES =====
     if (["ALUNO", "ALUNO_PROFESSOR"].includes(data.tipo) && data.dataNascimento) {
-      const idade = new Date().getFullYear() - new Date(data.dataNascimento).getFullYear();
+      const idade =
+        new Date().getFullYear() -
+        new Date(data.dataNascimento).getFullYear();
+
       if (idade < 18 && (!data.responsaveis || data.responsaveis.length === 0)) {
         ctx.addIssue({
           path: ["responsaveis"],
@@ -76,41 +97,66 @@ export const atualizarUsuarioSchema = z
     }
   });
 
-// Schema separado para atualizar foto de usuário
+/* =====================================================
+   ATUALIZAR FOTO DO USUÁRIO
+===================================================== */
 export const atualizarFotoSchema = z.object({
   fotoUrl: z.string().url({ message: "URL inválida" })
 });
 
-// ==================== ATUALIZAR PERFIL ====================
-export const atualizarPerfilSchema = z.object({
-  nome: z.string().optional(),
-  dataNascimento: z
-    .string()
-    .refine((date) => !date || !isNaN(Date.parse(date)), { message: "Data inválida" })
-    .optional(),
-  cpf: z.string().optional().nullable(),
-  genero: z.enum(["M", "F", "O"]).optional(),
-  email: z.string().email().optional().nullable(),
-  endereco: z.string().optional().nullable(),
-  telefone: z.string().optional().nullable(),
-  password: z.string().optional().nullable(),
-  imagem_perfil_url: z.string().url().optional().nullable(),
-}).superRefine((data, ctx) => {
-  // Valida senha mínima se enviada
-  if (data.password && data.password.length < 6) {
-    ctx.addIssue({
-      path: ["password"],
-      message: "A senha precisa ter pelo menos 6 caracteres",
-      code: z.ZodIssueCode.custom,
-    });
-  }
+/* =====================================================
+   ATUALIZAR PERFIL (PRÓPRIO USUÁRIO)
+   - Aceita NOME da faixa (ex: "Preta")
+   - Permissão é validada no controller
+===================================================== */
+export const atualizarPerfilSchema = z
+  .object({
+    nome: z.string().optional(),
+    nome_social: z.string().optional().nullable(),
 
-  // Valida CPF se enviado
-  if (data.cpf && !/^\d{11}$/.test(data.cpf.replace(/\D/g, ""))) {
-    ctx.addIssue({
-      path: ["cpf"],
-      message: "CPF inválido, deve conter 11 dígitos",
-      code: z.ZodIssueCode.custom,
-    });
-  }
-});
+    dataNascimento: z
+      .string()
+      .refine((date) => !date || !isNaN(Date.parse(date)), {
+        message: "Data inválida"
+      })
+      .optional(),
+
+    cpf: z.string().optional().nullable(),
+    genero: z.enum(["M", "F", "O"]).optional(),
+    email: z.string().email().optional().nullable(),
+    endereco: z.string().optional().nullable(),
+    telefone: z.string().optional().nullable(),
+    password: z.string().optional().nullable(),
+    imagem_perfil_url: z.string().url().optional().nullable(),
+
+    // ===== CAMPOS RESTRITOS AO COORDENADOR =====
+    faixa: z.string().optional().nullable(), // ex: "Preta"
+    grau: z.number().int().optional().nullable(),
+    tipo: z.enum([
+      "ADMIN",
+      "COORDENADOR",
+      "PROFESSOR",
+      "ALUNO",
+      "ALUNO_PROFESSOR"
+    ]).optional(),
+  })
+  .superRefine((data, ctx) => {
+
+    // ===== SENHA =====
+    if (data.password && data.password.length < 6) {
+      ctx.addIssue({
+        path: ["password"],
+        message: "A senha precisa ter pelo menos 6 caracteres",
+        code: z.ZodIssueCode.custom,
+      });
+    }
+
+    // ===== CPF =====
+    if (data.cpf && !/^\d{11}$/.test(data.cpf.replace(/\D/g, ""))) {
+      ctx.addIssue({
+        path: ["cpf"],
+        message: "CPF inválido, deve conter 11 dígitos",
+        code: z.ZodIssueCode.custom,
+      });
+    }
+  });
