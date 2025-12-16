@@ -5,6 +5,13 @@ const prisma = new PrismaClient();
 
 /* ------------------------- FUNÇÕES AUXILIARES ------------------------- */
 
+function formatarDataBR(data) {
+  return new Date(data).toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+  });
+}
+
+
 function calcularIdade(dataNascimento) {
   if (!dataNascimento) return null;
   const hoje = new Date();
@@ -475,25 +482,53 @@ async graduarAluno(req, res) {
   }
 },
 
+/* ---------------------- HISTÓRICO ---------------------- */
+async listarHistorico(req, res) {
+  try {
+    const { alunoId } = req.params;
 
+    const graduacoes = await prisma.graduacao.findMany({
+      where: { alunoId },
+      orderBy: { data_graduacao: "asc" },
+      include: { faixa: true },
+    });
 
-  /* ---------------------- HISTÓRICO ---------------------- */
-  async listarHistorico(req, res) {
-    try {
-      const { alunoId } = req.params;
+    const historico = [];
 
-      const historico = await prisma.graduacao.findMany({
-        where: { alunoId },
-        orderBy: { data_graduacao: "desc" },
-        include: { faixa: true },
+    for (let i = 0; i < graduacoes.length; i++) {
+      const atual = graduacoes[i];
+      const anterior = graduacoes[i - 1];
+
+      // ORIGEM: sempre uma faixa válida
+      const faixaOrigem =
+        anterior?.faixa?.corFaixa || atual.faixa.corFaixa;
+
+      // DESTINO
+      let destino;
+      if (anterior && anterior.faixa_id !== atual.faixa_id) {
+        destino = `Faixa ${atual.faixa.corFaixa}`;
+      } else {
+        destino = `${atual.grau}° Grau`;
+      }
+
+      historico.push({
+        data: formatarDataBR(atual.data_graduacao),
+        descricao: `Faixa ${faixaOrigem} → ${destino}`,
       });
-
-      return padraoSucesso(res, historico);
-    } catch (err) {
-      console.error(err);
-      return padraoErro(res, "Erro ao listar histórico de graduações.", 500);
     }
-  },
+
+    // mais recente primeiro
+    historico.reverse();
+
+    return padraoSucesso(res, historico);
+  } catch (err) {
+    console.error(err);
+    return padraoErro(res, "Erro ao listar histórico de graduações.", 500);
+  }
+},
+
+
+
 
 
 /* ---------------------- GRADUAÇÃO ATUAL ---------------------- */

@@ -120,34 +120,72 @@ export const listarCoordenadoresProfessores = async (req, res) => {
   }
 };
 
-// ==================== OBTER DETALHADO ====================
+// ==================== OBTER USUÁRIO DETALHADO ====================
 export const obterUsuarioDetalhado = async (req, res) => {
   try {
     const { id } = req.params;
+    const usuarioLogado = req.user;
 
-    // Se não for ADMIN, só pode ver seu próprio usuário
-    if (!["ADMIN", "COORDENADOR"].includes(req.user.tipo) && req.user.sub !== id) {
-  return res.status(403).json({ message: "Acesso negado" });
-}
+    // 🔐 Permissão
+    if (
+      !["ADMIN", "COORDENADOR"].includes(usuarioLogado.tipo) &&
+      usuarioLogado.sub !== id
+    ) {
+      return res.status(403).json({ message: "Acesso negado" });
+    }
 
-
+    // ===============================
+    // 👤 BUSCAR USUÁRIO
+    // ===============================
     const usuario = await prisma.usuario.findUnique({
       where: { id },
       include: {
         responsaveis: true,
-        turma_matriculas: { include: { turma: true } },
-        faixa: true,
-      },
+        turma_matriculas: {
+          include: { turma: true }
+        },
+        faixa: true
+      }
     });
 
-    if (!usuario) return res.status(404).json({ message: "Usuário não encontrado" });
+    if (!usuario) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
 
-    res.json({ sucesso: true, usuario });
+    // ===============================
+    // 🔥 PRESENÇA GERAL (TODAS AS TURMAS)
+    // ===============================
+    const totalPresencas = await prisma.frequencia.count({
+      where: {
+        id_aluno: id,
+        presente: true
+      }
+    });
+
+    // ===============================
+    // 🧹 MANTER JSON ORIGINAL
+    // ===============================
+    const usuarioFormatado = {
+      ...usuario,
+      aulas: totalPresencas // 👈 AGORA É SÓ UM NÚMERO
+    };
+
+    return res.status(200).json({
+      sucesso: true,
+      usuario: usuarioFormatado
+    });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erro interno", detalhe: error.message });
+    console.error("Erro obterUsuarioDetalhado:", error);
+    return res.status(500).json({
+      message: "Erro interno",
+      detalhe: error.message
+    });
   }
 };
+
+
+
 // ==================== ATUALIZAR PERFIL DO USUÁRIO ====================
 export const atualizarPerfil = async (req, res) => {
   try {
