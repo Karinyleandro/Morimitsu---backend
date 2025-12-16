@@ -51,94 +51,96 @@ class AniversariantesController {/**
  * → Lista todos alunos que fazem aniversário no mês atual
  * → Destaca quem faz aniversário HOJE com isToday = true
  */
-  static async aniversariantesDoMes(req, res) {
-    try {
-      const requester = req.user;
+static async aniversariantesDoMes(req, res) {
+  try {
+    const requester = req.user;
 
-      // Permissões
-      if (
-        !["PROFESSOR", "COORDENADOR", "ADMIN", "ALUNO_PROFESSOR"].includes(
-          requester?.tipo
-        )
-      ) {
-        return res.status(403).json({ message: "Permissão negada" });
-      }
+    // 🔐 Permissões
+    if (
+      !["PROFESSOR", "COORDENADOR", "ADMIN", "ALUNO_PROFESSOR"].includes(
+        requester?.tipo
+      )
+    ) {
+      return res.status(403).json({ message: "Permissão negada" });
+    }
 
-      const FOTO_PADRAO = "/fotoperfilsvg/Frame.svg";
+    const FOTO_PADRAO = "/fotoperfilsvg/Frame.svg";
 
-      // Data atual (UTC)
-      const hoje = new Date();
-      const mesAtual = hoje.getUTCMonth() + 1;
-      const diaHoje = hoje.getUTCDate();
+    // 📅 Data atual (UTC)
+    const hoje = new Date();
+    const mesAtual = hoje.getUTCMonth() + 1;
+    const diaHoje = hoje.getUTCDate();
 
-      // 🔥 BUSCA NO BANCO (SEM ENUM)
-      const alunos = await prisma.usuario.findMany({
-        where: {
-          OR: [
-            { tipo: "ALUNO" },
-            { tipo: "ALUNO_PROFESSOR" }
-          ],
-          ativo: true,
-          dataNascimento: { not: null }
-        },
-        include: {
-          turma_matriculas: {
-            take: 1,
-            select: {
-              turma: {
-                select: { nome_turma: true }
-              }
+    // 🔥 Busca alunos
+    const alunos = await prisma.usuario.findMany({
+      where: {
+        OR: [
+          { tipo: "ALUNO" },
+          { tipo: "ALUNO_PROFESSOR" }
+        ],
+        ativo: true,
+        dataNascimento: { not: null }
+      },
+      include: {
+        turma_matriculas: {
+          take: 1,
+          select: {
+            turma: {
+              select: { nome_turma: true }
             }
           }
         }
+      }
+    });
+
+    // 🔄 Processamento (HOJE → FIM DO MÊS)
+    const aniversariantes = alunos
+      .map(aluno => {
+        const nasc = aluno.dataNascimento;
+        if (!nasc) return null;
+
+        const mes = nasc.getUTCMonth() + 1;
+        const dia = nasc.getUTCDate();
+
+        // ❌ Ignora outros meses
+        if (mes !== mesAtual) return null;
+
+        // ❌ Ignora aniversários já passados
+        if (dia < diaHoje) return null;
+
+        return {
+          nome: aluno.nome,
+          aniversario: `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}`,
+          turma:
+            aluno.turma_matriculas?.[0]?.turma?.nome_turma ??
+            "Sem turma",
+          fotoPerfil: aluno.imagem_perfil_url || FOTO_PADRAO,
+          isToday: dia === diaHoje
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const diaA = Number(a.aniversario.split("/")[0]);
+        const diaB = Number(b.aniversario.split("/")[0]);
+
+        return diaA - diaB || a.nome.localeCompare(b.nome);
       });
 
-      // Processamento
-      const aniversariantes = alunos
-        .map(aluno => {
-          const nasc = aluno.dataNascimento;
-          if (!nasc) return null;
+    return res.status(200).json({
+      mesAtual,
+      diaHoje,
+      count: aniversariantes.length,
+      aniversariantes
+    });
 
-          const mes = nasc.getUTCMonth() + 1;
-          const dia = nasc.getUTCDate();
-
-          // Apenas do mês atual
-          if (mes !== mesAtual) return null;
-
-          return {
-            nome: aluno.nome,
-            aniversario: `${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}`,
-            turma:
-              aluno.turma_matriculas?.[0]?.turma?.nome_turma ??
-              "Sem turma",
-            fotoPerfil: aluno.imagem_perfil_url || FOTO_PADRAO,
-            isToday: dia === diaHoje
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => {
-          const diaA = Number(a.aniversario.split("/")[0]);
-          const diaB = Number(b.aniversario.split("/")[0]);
-          return diaA - diaB || a.nome.localeCompare(b.nome);
-        });
-
-      return res.status(200).json({
-        mesAtual,
-        count: aniversariantes.length,
-        aniversariantes
-      });
-
-    } catch (error) {
-      console.error("Erro ao listar aniversariantes do mês:", error);
-      return res.status(500).json({
-        message: "Erro interno",
-        error: error.message
-      });
-    }
+  } catch (error) {
+    console.error("Erro ao listar aniversariantes do mês:", error);
+    return res.status(500).json({
+      message: "Erro interno",
+      error: error.message
+    });
   }
-
-
-
+}
 
   /**
    * GET /aniversariantes/ano-atual

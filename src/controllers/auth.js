@@ -62,8 +62,6 @@ function generateCode(length = 5) {
   return token;
 }
 
-
-
 // Função auxiliar para calcular idade
 function calcularIdade(dataNascimento) {
   if (!dataNascimento) return 0;
@@ -107,6 +105,36 @@ function validarCPF(cpf) {
   return true;
 }
 
+function parseDateBR(dateStr) {
+  if (!dateStr) return null;
+
+  if (dateStr instanceof Date) return dateStr;
+
+  // Aceita apenas DD-MM-YYYY
+  const regex = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const match = dateStr.match(regex);
+
+  if (!match) {
+    throw new Error("Formato de data inválido. Use DD-MM-YYYY");
+  }
+
+  const [, dia, mes, ano] = match;
+
+  const date = new Date(Date.UTC(ano, mes - 1, dia));
+
+  // Validação real da data (ex: 31-02)
+  if (
+    date.getUTCDate() !== Number(dia) ||
+    date.getUTCMonth() !== Number(mes) - 1 ||
+    date.getUTCFullYear() !== Number(ano)
+  ) {
+    throw new Error("Data inválida");
+  }
+
+  return date;
+}
+
+
 export const register = async (req, res) => {
   try {
     const {
@@ -130,82 +158,135 @@ export const register = async (req, res) => {
 
     const tiposAlunos = ["ALUNO", "ALUNO_PROFESSOR"];
 
-    // --- CPF ---
+    // ======================
+    // 🎂 Data nascimento (DD-MM-YYYY)
+    // ======================
+    let dataNascimentoDate = null;
+    if (dataNascimento) {
+      try {
+        dataNascimentoDate = parseDateBR(dataNascimento);
+      } catch (err) {
+        return res.status(400).json({ message: err.message });
+      }
+    }
+
+    // ======================
+    // 🔎 CPF
+    // ======================
     if (cpf) {
       if (!validarCPF(cpf)) {
         return res.status(400).json({ message: "CPF inválido" });
       }
 
-      const cpfExiste = await prisma.usuario.findUnique({ where: { cpf } });
+      const cpfExiste = await prisma.usuario.findUnique({
+        where: { cpf }
+      });
+
       if (cpfExiste) {
         return res.status(400).json({ message: "CPF já cadastrado" });
       }
     }
 
-    // Calcula idade
-    const idade = dataNascimento ? calcularIdade(dataNascimento) : null;
+    // ======================
+    // 🎯 Idade
+    // ======================
+    const idade = dataNascimentoDate
+      ? calcularIdade(dataNascimentoDate)
+      : null;
 
-    // Valida responsáveis para menores de 18 anos
+    // ======================
+    // 👨‍👩‍👧 Responsáveis
+    // ======================
     if (tiposAlunos.includes(tipo) && idade !== null && idade < 18) {
       if (!responsaveis || responsaveis.length === 0) {
-        return res.status(400).json({ message: "Aluno menor de 18 anos precisa de pelo menos um responsável" });
+        return res.status(400).json({
+          message: "Aluno menor de 18 anos precisa de pelo menos um responsável"
+        });
       }
     }
 
-    // Prepara responsáveis
-    const responsaveisData = responsaveis && responsaveis.length > 0
-      ? { create: responsaveis.map(r => ({
-          telefone: r.telefone,
-          nome: r.nome || null,
-          email: r.email || null,
-          grau_parentesco: "Responsável"
-        })) }
-      : undefined;
+    const responsaveisData =
+      responsaveis && responsaveis.length > 0
+        ? {
+            create: responsaveis.map(r => ({
+              telefone: r.telefone,
+              nome: r.nome || null,
+              email: r.email || null,
+              grau_parentesco: "Responsável"
+            }))
+          }
+        : undefined;
 
-    // Prepara turmas
-    const turmaData = turmaIds && turmaIds.length > 0
-      ? { create: turmaIds.map(id => ({
-          turma: { connect: { id } },
-          ativo: true,
-          frequencia_acumulada: 0
-        })) }
-      : undefined;
+    // ======================
+    // 🏫 Turmas
+    // ======================
+    const turmaData =
+      turmaIds && turmaIds.length > 0
+        ? {
+            create: turmaIds.map(id => ({
+              turma: { connect: { id } },
+              ativo: true,
+              frequencia_acumulada: 0
+            }))
+          }
+        : undefined;
 
-    // Cria usuário
+    // ======================
+    // 👤 Criação
+    // ======================
     const user = await prisma.usuario.create({
       data: {
         nome,
         nome_social: nome_social || null,
         tipo,
         endereco: endereco || null,
-        dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
+        dataNascimento: dataNascimentoDate,
         cpf: cpf || null,
         telefone: telefone || null,
         genero: genero || null,
         email: email || null,
-        passwordHash: password ? await bcrypt.hash(password, SALT_ROUNDS) : null,
+        imagem_perfil_url: FOTO_PADRAO,
+        passwordHash: password
+          ? await bcrypt.hash(password, SALT_ROUNDS)
+          : null,
         grau: grau || null,
         num_matricula: num_matricula || null,
         aulas: aulas || null,
-        faixa: id_faixa ? { connect: { id: id_faixa } } : undefined,
+        faixa: id_faixa
+          ? { connect: { id: id_faixa } }
+          : undefined,
         responsaveis: responsaveisData,
         turma_matriculas: turmaData
       },
       include: {
         faixa: true,
         responsaveis: true,
-        turma_matriculas: { include: { turma: true } }
+        turma_matriculas: {
+          include: { turma: true }
+        }
       }
     });
 
-    res.status(201).json({ message: "Usuário criado com sucesso", user });
+    const { passwordHash, ...userSafe } = user;
+
+    return res.status(201).json({
+      message: "Usuário criado com sucesso",
+      user: {
+        ...userSafe,
+        dataNascimento: formatarDataBR(user.dataNascimento),
+        createdAt: formatarDataBR(user.createdAt),
+        updatedAt: formatarDataBR(user.updatedAt)
+      }
+    });
 
   } catch (error) {
     console.error("Erro ao criar usuário:", error);
-    res.status(500).json({ message: "Erro interno do servidor", error: error.message });
+    return res.status(500).json({
+      message: "Erro interno do servidor",
+      error: error.message
+    });
   }
 };
-
 
 
 function tratarVazio(v) {
@@ -213,48 +294,101 @@ function tratarVazio(v) {
   return v;
 }
 
+const FOTO_PADRAO = "/fotoperfilsvg/Frame.svg";
+
+function formatarDataBR(date) {
+  if (!date) return null;
+
+  const d = new Date(date);
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const ano = d.getFullYear();
+
+  return `${dia}-${mes}-${ano}`;
+}
 
 export async function login(req, res) {
   try {
     const { identifier, password } = req.body;
 
-    if (!identifier || !password)
-      return res.status(400).json({ message: "Informe identificador e senha" });
+    if (!identifier || !password) {
+      return res.status(400).json({
+        message: "Informe email, CPF ou matrícula e senha"
+      });
+    }
 
+    // 🔎 Busca por email, CPF ou matrícula
     const user = await prisma.usuario.findFirst({
-      where: { OR: [{ email: identifier }, { cpf: identifier }] },
+      where: {
+        OR: [
+          { email: identifier },
+          { cpf: identifier },
+          { num_matricula: identifier }
+        ]
+      }
     });
 
-    if (!user || !user.passwordHash)
-      return res.status(401).json({ message: "Credenciais inválidas" });
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({
+        message: "Credenciais inválidas"
+      });
+    }
 
-    if (!["ADMIN", "PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR"].includes(user.tipo))
-      return res.status(403).json({ message: "Usuário sem permissão de login" });
+    // 🔐 Tipos permitidos
+    if (!["ADMIN", "PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR"].includes(user.tipo)) {
+      return res.status(403).json({
+        message: "Usuário sem permissão de login"
+      });
+    }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) return res.status(401).json({ message: "Credenciais inválidas" });
+    // 🔑 Valida senha
+    const senhaValida = await bcrypt.compare(password, user.passwordHash);
+    if (!senhaValida) {
+      return res.status(401).json({
+        message: "Credenciais inválidas"
+      });
+    }
+
+    // ⏱ Atualiza último login
+    const agora = new Date();
 
     await prisma.usuario.update({
       where: { id: user.id },
-      data: { ultimo_login: new Date() },
+      data: { ultimo_login: agora }
     });
 
+    // 🔐 JWT
     const { token } = createJwt({
       sub: user.id,
       tipo: user.tipo,
-      nome: user.nome,
+      nome: user.nome
     });
 
+    // 🧼 Remove campo sensível
+    const { passwordHash, ...userSafe } = user;
+
+    // 📦 Resposta formatada
     return res.status(200).json({
       token,
       expiresIn: process.env.JWT_EXPIRES_IN,
-      user, // ← ID já é UUID
+      user: {
+        ...userSafe,
+        imagem_perfil_url: user.imagem_perfil_url || FOTO_PADRAO,
+        ultimo_login: formatarDataBR(agora),
+        dataNascimento: formatarDataBR(user.dataNascimento),
+        createdAt: formatarDataBR(user.createdAt),
+        updatedAt: formatarDataBR(user.updatedAt)
+      }
     });
-  } catch (e) {
-    console.error("Erro no login:", e);
-    return res.status(500).json({ message: "Erro interno" });
+
+  } catch (error) {
+    console.error("Erro no login:", error);
+    return res.status(500).json({
+      message: "Erro interno do servidor"
+    });
   }
 }
+
 
 export async function logout(req, res) {
   try {
@@ -283,7 +417,6 @@ export async function logout(req, res) {
     return res.status(500).json({ message: "Erro interno" });
   }
 }
-
 
 async function sendPasswordResetEmail(to, code) {
   const transporter = nodemailer.createTransport({
@@ -453,7 +586,6 @@ export async function requestPasswordReset(req, res) {
     return res.status(500).json({ message: "Erro interno no servidor." });
   }
 }
-
 
 export async function verifyResetCode(req, res) {
   try {
