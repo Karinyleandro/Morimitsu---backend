@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import swaggerJsDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
+import path from "path";
 
 import authRoutes from "./src/routes/auth_routes.js";
 import usuarioRoutes from "./src/routes/usuario_routes.js";
@@ -19,6 +20,7 @@ dotenv.config();
 const app = express();
 
 
+
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -29,6 +31,10 @@ app.use((req, res, next) => {
   console.log("Body recebido:", req.body);
   next();
 });
+
+app.use("/faixas", express.static(path.resolve("public/faixas")));
+app.use("/fotoperfilsvg", express.static(path.resolve("public/fotoperfilsvg")));
+
 
 const swaggerOptions = {
   definition: {

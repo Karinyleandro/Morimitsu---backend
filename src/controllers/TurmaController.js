@@ -405,7 +405,6 @@ export const registrarFrequencia = async (req, res) => {
   try {
     const usuarioLogado = req.user;
 
-    // Tipos de usuário permitidos
     const permitidos = ["PROFESSOR", "COORDENADOR", "ALUNO_PROFESSOR", "ADMIN"];
     if (!permitidos.includes(usuarioLogado.tipo)) {
       return padraoRespostaErro(res, "Sem permissão", 403);
@@ -422,6 +421,32 @@ export const registrarFrequencia = async (req, res) => {
       );
     }
 
+    // Validar formato dd/mm/yyyy ou dd-mm-yyyy
+    const regexBR = /^(\d{2})[\/-](\d{2})[\/-](\d{4})$/;
+    const match = data.match(regexBR);
+    if (!match) {
+      return padraoRespostaErro(
+        res,
+        "Data deve estar no formato dd/mm/yyyy ou dd-mm-yyyy",
+        400
+      );
+    }
+
+    const dia = parseInt(match[1], 10);
+    const mes = parseInt(match[2], 10) - 1; // JS months: 0-11
+    const ano = parseInt(match[3], 10);
+
+    const dataAula = new Date(ano, mes, dia);
+
+    // Verificar se a data é válida (ex: 31/02/2025 não existe)
+    if (
+      dataAula.getFullYear() !== ano ||
+      dataAula.getMonth() !== mes ||
+      dataAula.getDate() !== dia
+    ) {
+      return padraoRespostaErro(res, "Data inválida", 400);
+    }
+
     // Buscar turma
     const turma = await prisma.turma.findUnique({ where: { id: turmaId } });
     if (!turma) return padraoRespostaErro(res, "Turma não encontrada", 404);
@@ -433,8 +458,6 @@ export const registrarFrequencia = async (req, res) => {
     ) {
       return padraoRespostaErro(res, "Não autorizado para registrar nesta turma", 403);
     }
-
-    const dataAula = new Date(data);
 
     // Buscar registros existentes dessa aula
     const existentes = await prisma.frequencia.findMany({
@@ -461,7 +484,6 @@ export const registrarFrequencia = async (req, res) => {
         return padraoRespostaErro(res, "Formato de frequência inválido", 400);
       }
 
-      // Validar se o aluno pertence à turma
       if (!alunosValidos.has(f.alunoId)) {
         return padraoRespostaErro(
           res,
@@ -489,12 +511,10 @@ export const registrarFrequencia = async (req, res) => {
       }
     }
 
-    // Criar novos registros
     if (novos.length > 0) {
       await prisma.frequencia.createMany({ data: novos });
     }
 
-    // Atualizar existentes
     if (updates.length > 0) {
       await prisma.$transaction(
         updates.map(u => prisma.frequencia.update({ where: u.where, data: u.data }))
@@ -511,6 +531,8 @@ export const registrarFrequencia = async (req, res) => {
 
 
 
+
+
 export const rankingFrequencia = async (req, res) => {
   try {
     const usuarioLogado = req.user;
@@ -523,6 +545,7 @@ export const rankingFrequencia = async (req, res) => {
     const { turmaId } = req.params;
     if (!turmaId) return padraoRespostaErro(res, "turmaId é obrigatório", 400);
 
+    // Busca a turma e os alunos
     const turma = await prisma.turma.findUnique({
       where: { id: turmaId },
       include: { 
@@ -532,7 +555,7 @@ export const rankingFrequencia = async (req, res) => {
               select: {
                 id: true,
                 nome: true,
-                imagem_perfil_url: true // <-- 🔥 BUSCA A FOTO
+                imagem_perfil_url: true
               }
             } 
           } 
@@ -542,24 +565,26 @@ export const rankingFrequencia = async (req, res) => {
 
     if (!turma) return padraoRespostaErro(res, "Turma não encontrada", 404);
 
-    const DEFAULT_IMG = "/fotoperfilsvg/Frame.svg"; // 🔥 caminho padrão público
+    const DEFAULT_IMG = "/fotoperfilsvg/Frame.svg";
 
+    // Busca todas as frequências da turma
     const frequencias = await prisma.frequencia.findMany({
       where: { id_turma: turmaId }
     });
 
+    // Cria mapa inicial de alunos
     const mapa = new Map();
-
     for (const at of turma.aluno_turmas) {
       mapa.set(at.id_aluno, {
         alunoId: at.id_aluno,
         nome: at.aluno?.nome ?? null,
-        foto: at.aluno?.imagem_perfil_url ?? DEFAULT_IMG, // 🔥 usa foto padrão
+        foto: at.aluno?.imagem_perfil_url ?? DEFAULT_IMG,
         total: 0,
         presencas: 0
       });
     }
 
+    // Conta presenças e total de aulas
     for (const f of frequencias) {
       if (mapa.has(f.id_aluno)) {
         const obj = mapa.get(f.id_aluno);
@@ -568,11 +593,11 @@ export const rankingFrequencia = async (req, res) => {
       }
     }
 
+    // Calcula percentual e ordena ranking
     const ranking = Array.from(mapa.values())
-      .map((a) => ({
+      .map(a => ({
         ...a,
-        percentual:
-          a.total === 0 ? 0 : Number(((a.presencas / a.total) * 100).toFixed(2))
+        percentual: a.total === 0 ? 0 : Number(((a.presencas / a.total) * 100).toFixed(2))
       }))
       .sort((a, b) => b.percentual - a.percentual);
 

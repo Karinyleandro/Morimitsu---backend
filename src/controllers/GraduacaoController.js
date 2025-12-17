@@ -112,7 +112,7 @@ async listarAptosHome(req, res) {
 
       const minimo =
         requisito?.requisito_aulas ??
-        aulasNecessarias(faixaAtual?.nome, idade);
+        aulasNecessarias(faixaAtual?.corFaixa, idade);
 
       // validar tempo mínimo entre graduações
       let tempoOk = true;
@@ -182,7 +182,7 @@ async listarAptosGraduacao(req, res) {
       const { requisito } = await obterRequisitoParaProximoGrau(aluno);
       const { faixaAtual, proximaFaixa } = await obterProximaFaixaAtual(aluno);
 
-      const minimo = requisito?.requisito_aulas ?? aulasNecessarias(faixaAtual?.nome, idade);
+      const minimo = requisito?.requisito_aulas ?? aulasNecessarias(faixaAtual?.corFaixa, idade);
 
       let tempoOk = true;
       if (requisito?.tempo_minimo_dias) {
@@ -244,7 +244,7 @@ async statusAluno(req, res) {
 
     const minimo =
       requisito?.requisito_aulas ??
-      aulasNecessarias(aluno.faixa?.nome, idade);
+      aulasNecessarias(aluno.faixa?.corFaixa, idade);
 
     // tempo mínimo entre graduações
     let tempoOk = true;
@@ -328,7 +328,7 @@ async listarAptos(req, res) {
 
       const minimo =
         requisito?.requisito_aulas ??
-        aulasNecessarias(aluno.faixa?.nome, idade);
+        aulasNecessarias(aluno.faixa?.corFaixa, idade);
 
       let tempoOk = true;
 
@@ -404,7 +404,7 @@ async graduarAluno(req, res) {
 
     const { requisito, nextGrau } = reqObj;
 
-    const minimo = requisito?.requisito_aulas ?? aulasNecessarias(aluno.faixa?.nome, idade);
+    const minimo = requisito?.requisito_aulas ?? aulasNecessarias(aluno.faixa?.corFaixa, idade);
     if (aulasPresente < minimo) return padraoErro(res, "Aluno não possui aulas suficientes.");
 
     if (requisito?.tempo_minimo_dias) {
@@ -458,7 +458,7 @@ async graduarAluno(req, res) {
 
     /* --------- UPGRADE PARA ALUNO_PROFESSOR -------- */
     const faixaNova = await prisma.faixa.findUnique({ where: { id: novaFaixaId } });
-    if (faixaNova?.nome?.toLowerCase().includes("roxa") && usuarioAtualizado.tipo === "ALUNO") {
+    if (faixaNova?.corFaixa?.toLowerCase().includes("roxa") && usuarioAtualizado.tipo === "ALUNO") {
       await prisma.usuario.update({ where: { id: aluno.id }, data: { tipo: "ALUNO_PROFESSOR" } });
     }
 
@@ -467,7 +467,7 @@ async graduarAluno(req, res) {
       data: {
         usuario_id: coordenadorId,
         acao: "GRADUACAO",
-        descricao: `Graduou usuário ${aluno.id} — ${faixaNova?.nome}, grau ${novoGrau}`,
+        descricao: `Graduou usuário ${aluno.id} — ${faixaNova?.corFaixa}, grau ${novoGrau}`,
       },
     });
 
@@ -482,7 +482,7 @@ async graduarAluno(req, res) {
   }
 },
 
-/* ---------------------- HISTÓRICO ---------------------- */
+/* ---------------------- HISTÓRICO ---------------------- */ 
 async listarHistorico(req, res) {
   try {
     const { alunoId } = req.params;
@@ -493,29 +493,11 @@ async listarHistorico(req, res) {
       include: { faixa: true },
     });
 
-    const historico = [];
-
-    for (let i = 0; i < graduacoes.length; i++) {
-      const atual = graduacoes[i];
-      const anterior = graduacoes[i - 1];
-
-      // ORIGEM: sempre uma faixa válida
-      const faixaOrigem =
-        anterior?.faixa?.corFaixa || atual.faixa.corFaixa;
-
-      // DESTINO
-      let destino;
-      if (anterior && anterior.faixa_id !== atual.faixa_id) {
-        destino = `Faixa ${atual.faixa.corFaixa}`;
-      } else {
-        destino = `${atual.grau}° Grau`;
-      }
-
-      historico.push({
-        data: formatarDataBR(atual.data_graduacao),
-        descricao: `Faixa ${faixaOrigem} → ${destino}`,
-      });
-    }
+    const historico = graduacoes.map((graduacao) => ({
+      data: formatarDataBR(graduacao.data_graduacao),
+      corFaixa: graduacao.faixa?.corFaixa || null,
+      grau: graduacao.grau || null,
+    }));
 
     // mais recente primeiro
     historico.reverse();
@@ -526,9 +508,6 @@ async listarHistorico(req, res) {
     return padraoErro(res, "Erro ao listar histórico de graduações.", 500);
   }
 },
-
-
-
 
 
 /* ---------------------- GRADUAÇÃO ATUAL ---------------------- */

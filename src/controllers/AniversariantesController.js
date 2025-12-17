@@ -67,9 +67,11 @@ static async aniversariantesDoMes(req, res) {
     const FOTO_PADRAO = "/fotoperfilsvg/Frame.svg";
 
     // 📅 Data atual (UTC)
+    // 📅 Data atual (local)
     const hoje = new Date();
-    const mesAtual = hoje.getUTCMonth() + 1;
-    const diaHoje = hoje.getUTCDate();
+    const mesAtual = hoje.getMonth() + 1; // Local time
+    const diaHoje = hoje.getDate(); // Local time
+
 
     // 🔥 Busca alunos
     const alunos = await prisma.usuario.findMany({
